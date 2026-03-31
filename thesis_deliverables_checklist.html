@@ -1,0 +1,180 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.wrap{padding:1rem 0}
+.section{margin-bottom:1.25rem;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+.sec-header{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--color-background-secondary)}
+.sec-header:hover{background:var(--color-background-tertiary)}
+.sec-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;min-width:36px;text-align:center}
+.badge-cap{background:var(--color-background-info);color:var(--color-text-info)}
+.badge-ia{background:var(--color-background-warning);color:var(--color-text-warning)}
+.badge-iso{background:var(--color-background-success);color:var(--color-text-success)}
+.badge-doc{background:var(--color-background-danger);color:var(--color-text-danger)}
+.sec-title{font-size:14px;font-weight:500;color:var(--color-text-primary);flex:1}
+.sec-prog{font-size:12px;color:var(--color-text-secondary)}
+.chevron{font-size:12px;color:var(--color-text-tertiary);transition:transform .2s}
+.chevron.open{transform:rotate(90deg)}
+.sec-body{display:none;padding:8px 14px 12px}
+.sec-body.open{display:block}
+.item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.item:last-child{border-bottom:none}
+.cb{width:16px;height:16px;accent-color:var(--color-text-info);cursor:pointer;margin-top:2px;flex-shrink:0}
+.item-text{font-size:13px;color:var(--color-text-primary);line-height:1.5}
+.item-note{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.tag{font-size:10px;padding:1px 6px;border-radius:3px;font-weight:500;margin-left:6px;vertical-align:middle}
+.t-req{background:#E6F1FB;color:#185FA5}.t-db{background:#EAF3DE;color:#3B6D11}.t-uml{background:#EEEDFE;color:#534AB7}.t-api{background:#FAEEDA;color:#854F0B}.t-ui{background:#FAECE7;color:#993C1D}.t-data{background:#FBEAF0;color:#993356}.t-metric{background:#E1F5EE;color:#0F6E56}
+.progress-bar{height:6px;background:var(--color-background-tertiary);border-radius:3px;margin:12px 0 4px;overflow:hidden}
+.progress-fill{height:100%;background:var(--color-text-info);border-radius:3px;transition:width .3s}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem}
+.stat{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px;text-align:center}
+.stat-n{font-size:22px;font-weight:500;color:var(--color-text-primary)}
+.stat-l{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+@media(prefers-color-scheme:dark){.t-req{background:#0C447C;color:#B5D4F4}.t-db{background:#27500A;color:#C0DD97}.t-uml{background:#3C3489;color:#CECBF6}.t-api{background:#633806;color:#FAC775}.t-ui{background:#71130C;color:#F5C4B3}.t-data{background:#72243E;color:#F4C0D1}.t-metric{background:#085041;color:#9FE1CB}}
+</style>
+<div class="wrap">
+<div class="summary" id="summary">
+  <div class="stat"><div class="stat-n" id="s-total">0</div><div class="stat-l">Total entregables</div></div>
+  <div class="stat"><div class="stat-n" id="s-done" style="color:var(--color-text-success)">0</div><div class="stat-l">Completados</div></div>
+  <div class="stat"><div class="stat-n" id="s-pend" style="color:var(--color-text-warning)">0</div><div class="stat-l">Pendientes</div></div>
+  <div class="stat"><div class="stat-n" id="s-pct">0%</div><div class="stat-l">Progreso total</div></div>
+</div>
+
+<div id="sections"></div>
+</div>
+
+<script>
+const data = [
+  {
+    id:'cap3sw', title:'Cap. III — SCRUM: sistema web', badge:'cap3sw', badgeClass:'badge-cap',
+    items:[
+      {text:'Historias de usuario (Product Backlog)', note:'Al menos 15–20 historias con criterios de aceptación', tags:['req']},
+      {text:'Planificación de sprints (mínimo 4 sprints)', note:'Sprint Goal, Sprint Backlog, duración estimada por sprint', tags:['req']},
+      {text:'Diagrama de casos de uso', note:'Actores: Operario, Administrador. Casos: capturar imagen, ver estimación, gestionar animales...', tags:['uml']},
+      {text:'Diagrama de arquitectura cliente-servidor', note:'Frontend React ↔ Backend FastAPI ↔ Servicio de inferencia Docker ↔ PostgreSQL', tags:['uml']},
+      {text:'Diagrama de clases / componentes MVC', note:'Modelo (entidades del hato), Vista (componentes React), Controlador (endpoints)', tags:['uml']},
+      {text:'Diagrama de base de datos (ER)', note:'Tablas: animal, estimacion, imagen, usuario, sesion. Claves, relaciones y tipos de dato', tags:['db']},
+      {text:'Especificación de API REST (endpoints)', note:'POST /estimacion, GET /animal/{id}/historial, POST /auth/login, etc. Con request/response', tags:['api']},
+      {text:'Wireframes o mockups de los 5 módulos', note:'Adquisición, procesamiento, estimación, visualización, almacenamiento', tags:['ui']},
+      {text:'Descripción del pipeline de inferencia', note:'Flujo: imagen → YOLOv8 detección → OpenCV morfometría → XGBoost/YOLOv8 clasif → JSON', tags:['uml']},
+      {text:'Documentación de despliegue con Docker', note:'docker-compose.yml con servicios: web, api, inference, db', tags:['req']},
+    ]
+  },
+  {
+    id:'cap3ia', title:'Cap. III — CRISP-DM: modelos IA', badge:'crisp', badgeClass:'badge-ia',
+    items:[
+      {text:'Comprensión del negocio (formalización)', note:'Criterios de éxito: R²>0.90 para masa, F1>0.85 para BCS', tags:['req']},
+      {text:'Descripción del dataset de imágenes', note:'Nº total de imágenes, distribución por clase BCS, resolución, fuente (Criadero El Puente)', tags:['data']},
+      {text:'Protocolo de captura de imágenes', note:'Distancia, ángulo lateral/posterior, iluminación, postura del animal', tags:['data']},
+      {text:'Proceso de etiquetado/anotación', note:'Herramienta usada (Roboflow, CVAT), formato YOLO, quién etiquetó, validación inter-anotador', tags:['data']},
+      {text:'Preprocesamiento y aumentación de datos', note:'Resize, normalización, flip, rotación, brillo. Justificar decisiones', tags:['data']},
+      {text:'Configuración del entrenamiento YOLOv8 (masa)', note:'Variante (n/s/m), epochs, batch size, lr, splits train/val/test', tags:['metric']},
+      {text:'Configuración del entrenamiento YOLOv8 (BCS)', note:'Variante, clases (1.0-2.0, 2.5, 3.0, 4.0-5.0), hiperparámetros', tags:['metric']},
+      {text:'Justificación del modelo XGBoost para masa', note:'Por qué XGBoost sobre regresión profunda en dataset pequeño (L1/L2, sin GPU)', tags:['req']},
+      {text:'Descripción de las métricas de evaluación', note:'MAE, RMSE, R² para regresión. Precision, Recall, F1, Confusion Matrix para clasificación', tags:['metric']},
+    ]
+  },
+  {
+    id:'cap4r', title:'Cap. IV — Resultados', badge:'cap4', badgeClass:'badge-cap',
+    items:[
+      {text:'Tabla de métricas del modelo de masa (regresión)', note:'MAE, RMSE, R² en conjunto de prueba. Comparar con estudios relacionados (Wang 2025, Weber 2020)', tags:['metric']},
+      {text:'Gráfica de predichos vs reales (masa corporal)', note:'Scatter plot con línea ideal. Mostrar distribución del error', tags:['metric']},
+      {text:'Comparación estimación vs pesaje real en campo', note:'Al menos 10–15 animales del Criadero El Puente con datos reales de báscula', tags:['data']},
+      {text:'Matriz de confusión del modelo BCS', note:'Clases: muy delgado, transición, óptimo, sobrepeso. Mostrar errores entre clases adyacentes', tags:['metric']},
+      {text:'Tabla de métricas del modelo BCS (clasificación)', note:'Precision, Recall, F1-score por clase y macro/weighted. Accuracy general', tags:['metric']},
+      {text:'Capturas de pantalla del sistema web funcionando', note:'Los 5 módulos: captura, procesamiento, estimación, visualización, historial', tags:['ui']},
+      {text:'Resultados ISO/IEC 25010 — Comportamiento temporal', note:'Latencia promedio por estimación (objetivo <5s). Herramienta: Postman, k6 o similar', tags:['metric']},
+      {text:'Resultados ISO/IEC 25010 — Uso de recursos', note:'% CPU y GB RAM del pipeline YOLOv8+SAM+XGBoost durante inferencia activa', tags:['metric']},
+      {text:'Resultados ISO/IEC 25010 — Capacidad', note:'Nº máximo de peticiones concurrentes antes de degradar el tiempo de respuesta', tags:['metric']},
+      {text:'Throughput del sistema (req/s)', note:'Peticiones procesadas por segundo bajo carga simulada (varios operarios simultáneos)', tags:['metric']},
+    ]
+  },
+  {
+    id:'cap5', title:'Cap. V — Conclusiones y Recomendaciones', badge:'cap5', badgeClass:'badge-cap',
+    items:[
+      {text:'Conclusión 1: diagnóstico del método actual', note:'Responde al objetivo específico 1 — limitaciones del Criadero El Puente', tags:['req']},
+      {text:'Conclusión 2: modelos CRISP-DM', note:'Responde al objetivo 2 — precisión alcanzada en masa y BCS', tags:['req']},
+      {text:'Conclusión 3: sistema web SCRUM', note:'Responde al objetivo 3 — funcionalidad de los 5 módulos', tags:['req']},
+      {text:'Conclusión 4: evaluación ISO/IEC 25010', note:'Responde al objetivo 4 — eficiencia de desempeño del sistema', tags:['req']},
+      {text:'Recomendaciones (mínimo 3)', note:'Ej: ampliar dataset, integrar cámara 3D, replicar en otras razas, mantenimiento del modelo', tags:['req']},
+    ]
+  },
+  {
+    id:'doccomp', title:'Documentos complementarios', badge:'docs', badgeClass:'badge-doc',
+    items:[
+      {text:'Resumen (200–300 palabras, un solo párrafo)', note:'Problema, objetivo, metodología, resultados principales y conclusión. En español', tags:['req']},
+      {text:'Abstract (traducción por docente de inglés)', note:'Versión fiel al resumen, no automática', tags:['req']},
+      {text:'Introducción (3–5 párrafos)', note:'Contexto, problema, propuesta, estructura del documento', tags:['req']},
+      {text:'Glosario de términos técnicos', note:'Opcional pero recomendado: BCS, CRISP-DM, YOLOv8, SAM, XGBoost, MAE, RMSE, MVC...', tags:['req']},
+      {text:'Bibliografía completa en formato APA 7', note:'Verificar que todas las citas del texto tengan su referencia. Hay ~25 fuentes en el doc actual', tags:['req']},
+      {text:'Páginas de autoría y derechos (completar nombres)', note:'Reemplazar "Nombres y Apellidos", fecha, cédula en las páginas iniciales', tags:['req']},
+      {text:'Dedicatoria y Agradecimiento', note:'Un solo párrafo cada uno', tags:['req']},
+      {text:'Anexos: capturas del dataset y anotaciones', note:'Ejemplos de imágenes etiquetadas, distribución del dataset, ejemplos de salida del modelo', tags:['data']},
+      {text:'Anexo: manual de usuario del sistema web', note:'Pasos para capturar imagen, interpretar resultados, gestionar historial del hato', tags:['ui']},
+      {text:'Anexo: consentimiento del Criadero El Puente', note:'Carta de autorización para uso de imágenes del hato y datos productivos', tags:['req']},
+    ]
+  }
+];
+
+const tagLabels={req:'requerimiento',db:'base de datos',uml:'diagrama',api:'API REST',ui:'interfaz',data:'dataset/datos',metric:'métrica'};
+
+function renderSections(){
+  const cont=document.getElementById('sections');
+  cont.innerHTML='';
+  data.forEach(sec=>{
+    const div=document.createElement('div');
+    div.className='section';
+    div.innerHTML=`
+      <div class="sec-header" onclick="toggle('${sec.id}')">
+        <span class="sec-badge ${sec.badgeClass}">${sec.badge}</span>
+        <span class="sec-title">${sec.title}</span>
+        <span class="sec-prog" id="prog-${sec.id}">0/${sec.items.length}</span>
+        <span class="chevron" id="chev-${sec.id}">▶</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="bar-${sec.id}" style="width:0%"></div></div>
+      <div class="sec-body" id="body-${sec.id}">
+        ${sec.items.map((it,i)=>`
+          <div class="item">
+            <input type="checkbox" class="cb" id="cb-${sec.id}-${i}" onchange="updateStats()">
+            <div>
+              <div class="item-text">${it.text}${it.tags.map(t=>`<span class="tag t-${t}">${tagLabels[t]}</span>`).join('')}</div>
+              <div class="item-note">${it.note}</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+    cont.appendChild(div);
+  });
+  updateStats();
+}
+
+function toggle(id){
+  const body=document.getElementById('body-'+id);
+  const chev=document.getElementById('chev-'+id);
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
+}
+
+function updateStats(){
+  let total=0,done=0;
+  data.forEach(sec=>{
+    let secDone=0;
+    sec.items.forEach((_,i)=>{
+      total++;
+      const cb=document.getElementById(`cb-${sec.id}-${i}`);
+      if(cb&&cb.checked){done++;secDone++;}
+    });
+    const pct=sec.items.length?Math.round(secDone/sec.items.length*100):0;
+    const prog=document.getElementById('prog-'+sec.id);
+    const bar=document.getElementById('bar-'+sec.id);
+    if(prog)prog.textContent=`${secDone}/${sec.items.length}`;
+    if(bar)bar.style.width=pct+'%';
+  });
+  document.getElementById('s-total').textContent=total;
+  document.getElementById('s-done').textContent=done;
+  document.getElementById('s-pend').textContent=total-done;
+  document.getElementById('s-pct').textContent=Math.round(done/total*100)+'%';
+}
+
+renderSections();
+toggle('cap3sw');
+</script>

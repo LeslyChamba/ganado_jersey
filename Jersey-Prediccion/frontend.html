@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JER-WEIGHT — Sistema de Análisis Ganadero</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --earth: #2C1810;
+    --clay: #8B4513;
+    --hay: #D4A853;
+    --cream: #F5EDD8;
+    --sage: #6B8F71;
+    --sage-light: #A8C5AD;
+    --dark: #1A1008;
+    --accent: #E07B39;
+    --accent-hot: #FF5722;
+    --panel: rgba(44, 24, 16, 0.85);
+    --glass: rgba(245, 237, 216, 0.06);
+    --border: rgba(212, 168, 83, 0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--dark);
+    color: var(--cream);
+    font-family: 'Lora', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(139,69,19,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(107,143,113,0.1) 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    background: rgba(26,16,8,0.9);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.3rem;
+    letter-spacing: -0.02em;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--clay), var(--hay));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+  }
+  .logo span { color: var(--hay); }
+
+  nav { display: flex; gap: 0; }
+  .nav-btn {
+    background: none; border: none;
+    color: rgba(245,237,216,0.5);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .nav-btn:hover { color: var(--cream); background: var(--glass); }
+  .nav-btn.active { color: var(--hay); background: rgba(212,168,83,0.12); }
+
+  /* ── LAYOUT ── */
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  /* ── VIEWS ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ── ANALYSIS VIEW ── */
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    background: var(--glass);
+    padding: 3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--hay);
+    background: rgba(212,168,83,0.06);
+  }
+  .upload-zone.has-image { padding: 0; }
+
+  #preview-container {
+    width: 100%; height: 100%;
+    min-height: 420px;
+    position: relative;
+    display: none;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  #preview-container.visible { display: block; }
+
+  #preview-img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* Overlays on image */
+  .analysis-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .body-seg-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(107,143,113,0.15), rgba(224,123,57,0.1));
+    opacity: 0;
+    transition: opacity 0.5s;
+    border-radius: 14px;
+  }
+  .body-seg-overlay.visible { opacity: 1; }
+
+  .keypoint {
+    position: absolute;
+    width: 10px; height: 10px;
+    background: var(--hay);
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px rgba(212,168,83,0.8);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .keypoint.visible { opacity: 1; }
+  .keypoint-line {
+    position: absolute;
+    height: 1.5px;
+    background: rgba(212,168,83,0.6);
+    transform-origin: left center;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .keypoint-line.visible { opacity: 1; }
+
+  .upload-icon {
+    font-size: 3rem;
+    opacity: 0.4;
+  }
+  .upload-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--cream);
+  }
+  .upload-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: rgba(245,237,216,0.4);
+    letter-spacing: 0.05em;
+  }
+  #file-input { display: none; }
+
+  /* Action buttons below upload */
+  .upload-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .btn {
+    padding: 0.65rem 1.4rem;
+    border-radius: 8px;
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--clay), var(--accent));
+    color: white;
+    font-weight: 500;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(224,123,57,0.35); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-ghost {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    color: var(--cream);
+  }
+  .btn-ghost:hover { border-color: var(--hay); color: var(--hay); }
+
+  /* Results Panel */
+  .results-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .panel-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.4rem;
+    backdrop-filter: blur(20px);
+  }
+
+  .panel-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--hay);
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Big metric */
+  .metric-big {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+  }
+  .metric-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 3.5rem;
+    font-weight: 800;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--cream), var(--hay));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .metric-unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    color: rgba(245,237,216,0.5);
+  }
+  .metric-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: rgba(245,237,216,0.4);
+    text-transform: uppercase;
+  }
+  .confidence-bar {
+    margin-top: 1rem;
+    height: 4px;
+    background: rgba(245,237,216,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--sage), var(--hay));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 1s ease;
+  }
+  .confidence-label {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.4rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: rgba(245,237,216,0.3);
+  }
+
+  /* BCS Score */
+  .bcs-scale {
+    display: flex;
+    gap: 3px;
+    margin: 1rem 0 0.5rem;
+  }
+  .bcs-pip {
+    flex: 1;
+    height: 28px;
+    border-radius: 4px;
+    background: rgba(245,237,216,0.08);
+    border: 1px solid rgba(245,237,216,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: rgba(245,237,216,0.25);
+    transition: all 0.4s;
+    position: relative;
+    overflow: hidden;
+  }
+  .bcs-pip.active {
+    background: linear-gradient(135deg, var(--clay), var(--accent));
+    border-color: var(--accent);
+    color: white;
+    box-shadow: 0 2px 12px rgba(224,123,57,0.4);
+  }
+  .bcs-pip.near {
+    background: rgba(224,123,57,0.2);
+    border-color: rgba(224,123,57,0.3);
+    color: rgba(245,237,216,0.5);
+  }
+
+  .bcs-description {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--sage-light);
+    line-height: 1.5;
+    margin-top: 0.5rem;
+  }
+
+  /* Morphometrics grid */
+  .morph-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .morph-item {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+  }
+  .morph-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    color: rgba(245,237,216,0.35);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+  }
+  .morph-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--cream);
+  }
+  .morph-val span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: rgba(245,237,216,0.4);
+    font-weight: 400;
+  }
+
+  /* Animal ID */
+  .animal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .form-row { display: flex; gap: 0.75rem; }
+  .field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .field label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(245,237,216,0.4);
+  }
+  .field input, .field select {
+    background: rgba(245,237,216,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--cream);
+    padding: 0.55rem 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--hay); }
+  .field select option { background: var(--earth); }
+
+  /* Processing animation */
+  .processing-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(26,16,8,0.85);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    border-radius: 14px;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+  }
+  .processing-overlay.active { display: flex; }
+
+  .scan-line {
+    width: 200px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--hay), transparent);
+    animation: scan 1.5s ease-in-out infinite;
+    border-radius: 1px;
+  }
+  @keyframes scan {
+    0% { transform: translateY(-40px); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateY(40px); opacity: 0; }
+  }
+
+  .processing-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 200px;
+  }
+  .proc-step {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: rgba(245,237,216,0.3);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.3s;
+  }
+  .proc-step.done { color: var(--sage-light); }
+  .proc-step.active { color: var(--hay); }
+  .proc-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .proc-step.active .proc-dot { animation: pulse 0.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:0.6} }
+
+  /* ── DASHBOARD / RECORDS VIEW ── */
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+  .page-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  .page-title span { color: var(--hay); }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem;
+    backdrop-filter: blur(20px);
+  }
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--hay);
+    line-height: 1;
+  }
+  .stat-lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: rgba(245,237,216,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 0.3rem;
+  }
+
+  /* Records table */
+  .records-table-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+  }
+  .table-header-bar {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .table-header-bar h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  .search-input {
+    background: rgba(245,237,216,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.8rem;
+    color: var(--cream);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    width: 200px;
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--hay); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(245,237,216,0.35);
+    padding: 0.75rem 1.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: rgba(245,237,216,0.02);
+  }
+  tbody tr {
+    border-bottom: 1px solid rgba(212,168,83,0.08);
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+  tbody tr:hover { background: rgba(212,168,83,0.05); }
+  tbody td {
+    padding: 0.9rem 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+  }
+  .td-id { color: var(--hay); font-weight: 500; }
+  .td-mass { font-weight: 600; }
+  .bcs-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .bcs-1,.bcs-2 { background: rgba(224,50,50,0.15); color: #ff8a8a; border: 1px solid rgba(224,50,50,0.3); }
+  .bcs-3 { background: rgba(224,170,57,0.15); color: var(--hay); border: 1px solid rgba(224,170,57,0.3); }
+  .bcs-4 { background: rgba(107,143,113,0.15); color: var(--sage-light); border: 1px solid rgba(107,143,113,0.3); }
+  .bcs-5 { background: rgba(50,150,50,0.15); color: #80ff80; border: 1px solid rgba(50,150,50,0.3); }
+  .status-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+  }
+  .status-ok { background: var(--sage); }
+  .status-warn { background: var(--hay); }
+  .status-alert { background: #ff5555; animation: pulse 1s infinite; }
+
+  /* ── CHART / EVOLUTION VIEW ── */
+  .evolution-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.5rem;
+  }
+  .animal-list-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    max-height: 600px;
+  }
+  .animal-list-header {
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .animal-list {
+    overflow-y: auto;
+    max-height: 540px;
+  }
+  .animal-item {
+    padding: 0.85rem 1.2rem;
+    border-bottom: 1px solid rgba(212,168,83,0.06);
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .animal-item:hover, .animal-item.active { background: rgba(212,168,83,0.08); }
+  .animal-item.active { border-left: 3px solid var(--hay); }
+  .animal-avatar {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--clay), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+  .animal-info { flex: 1; }
+  .animal-tag {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .animal-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    color: rgba(245,237,216,0.35);
+    margin-top: 0.1rem;
+  }
+
+  /* SVG Chart */
+  .chart-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    backdrop-filter: blur(20px);
+  }
+  .chart-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+  }
+  .chart-title span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: var(--hay);
+    margin-left: 0.5rem;
+  }
+  svg.chart { width: 100%; height: 300px; }
+  .chart-line { fill: none; stroke: var(--hay); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .chart-area { fill: url(#areaGrad); }
+  .chart-dot { fill: var(--hay); stroke: var(--dark); stroke-width: 2; r: 5; }
+  .chart-bcs-line { fill: none; stroke: var(--sage-light); stroke-width: 2; stroke-dasharray: 4,3; opacity: 0.7; }
+
+  /* Placeholder */
+  .placeholder-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    gap: 0.75rem;
+    opacity: 0.4;
+  }
+  .placeholder-state .icon { font-size: 3rem; }
+  .placeholder-state p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Notification toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--sage);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 500;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: #8b2020; }
+
+  /* Camera modal */
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200;
+    backdrop-filter: blur(8px);
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--earth);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 600px;
+  }
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-close {
+    background: none; border: none;
+    color: rgba(245,237,216,0.4);
+    cursor: pointer; font-size: 1.2rem;
+    transition: color 0.2s;
+  }
+  .modal-close:hover { color: var(--cream); }
+  #camera-video {
+    width: 100%;
+    border-radius: 10px;
+    background: black;
+    display: block;
+    max-height: 350px;
+    object-fit: cover;
+  }
+  .camera-actions {
+    display: flex; gap: 1rem; margin-top: 1rem;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .analysis-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .evolution-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🐄</div>
+    Bovine<span>AI</span>
+  </div>
+  <nav>
+    <button class="nav-btn active" onclick="showView('analysis')">◈ Análisis</button>
+    <button class="nav-btn" onclick="showView('records')">◈ Registros</button>
+    <button class="nav-btn" onclick="showView('evolution')">◈ Evolución</button>
+  </nav>
+</header>
+
+<div class="app">
+
+  <!-- ══════════════ ANALYSIS VIEW ══════════════ -->
+  <div class="view active" id="view-analysis">
+    <div class="analysis-grid">
+
+      <!-- LEFT: Upload + Preview -->
+      <div>
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+          <div id="upload-prompt">
+            <div class="upload-icon">📷</div>
+            <div class="upload-title">Cargar imagen del animal</div>
+            <div class="upload-sub">JPG · PNG · WEBP · MP4 — Arrastra o haz clic</div>
+          </div>
+          <div id="preview-container">
+            <img id="preview-img" alt="Preview">
+            <div class="body-seg-overlay" id="seg-overlay"></div>
+            <div class="analysis-overlay" id="keypoints-layer"></div>
+            <div class="processing-overlay" id="proc-overlay">
+              <div class="scan-line"></div>
+              <div class="processing-steps" id="proc-steps">
+                <div class="proc-step" id="step-0"><div class="proc-dot"></div>Cargando imagen</div>
+                <div class="proc-step" id="step-1"><div class="proc-dot"></div>Segmentando silueta</div>
+                <div class="proc-step" id="step-2"><div class="proc-dot"></div>Extrayendo keypoints</div>
+                <div class="proc-step" id="step-3"><div class="proc-dot"></div>Calculando morfometría</div>
+                <div class="proc-step" id="step-4"><div class="proc-dot"></div>Estimando masa (DL)</div>
+                <div class="proc-step" id="step-5"><div class="proc-dot"></div>Calculando BCS</div>
+                <div class="proc-step" id="step-6"><div class="proc-dot"></div>Generando reporte</div>
+              </div>
+            </div>
+          </div>
+          <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFile(event)">
+        </div>
+
+        <div class="upload-actions">
+          <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis()" disabled>
+            ▶ Analizar
+          </button>
+          <button class="btn btn-ghost" onclick="openCamera()">
+            📷 Cámara
+          </button>
+          <button class="btn btn-ghost" onclick="loadSample()">
+            ⚡ Demo
+          </button>
+          <button class="btn btn-ghost" onclick="resetUpload()">
+            ↺ Limpiar
+          </button>
+        </div>
+
+        <!-- Animal ID form -->
+        <div class="panel-card" style="margin-top:1rem;">
+          <div class="panel-title">Identificación del animal</div>
+          <div class="animal-form">
+            <div class="form-row">
+              <div class="field">
+                <label>ID / Arete</label>
+                <input type="text" id="f-id" placeholder="BOV-001">
+              </div>
+              <div class="field">
+                <label>Raza</label>
+                <select id="f-raza">
+                  <option value="">Seleccionar...</option>
+                  <option>Brahman</option>
+                  <option>Angus</option>
+                  <option>Hereford</option>
+                  <option>Simmental</option>
+                  <option>Holstein</option>
+                  <option>Charolais</option>
+                  <option>Mestizo</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label>Sexo</label>
+                <select id="f-sexo">
+                  <option value="">—</option>
+                  <option>Macho</option>
+                  <option>Hembra</option>
+                  <option>Castrado</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Edad aprox.</label>
+                <input type="text" id="f-edad" placeholder="18 meses">
+              </div>
+              <div class="field">
+                <label>Lote / Potrero</label>
+                <input type="text" id="f-lote" placeholder="Lote A">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Results -->
+      <div class="results-panel" id="results-panel">
+
+        <!-- Placeholder -->
+        <div class="panel-card" id="results-placeholder">
+          <div class="placeholder-state">
+            <div class="icon">🔍</div>
+            <p>Carga una imagen y<br>presiona Analizar</p>
+          </div>
+        </div>
+
+        <!-- Results (hidden until analyzed) -->
+        <div id="results-content" style="display:none; display:flex; flex-direction:column; gap:1rem;">
+
+          <!-- Weight -->
+          <div class="panel-card">
+            <div class="panel-title">Masa estimada</div>
+            <div class="metric-big">
+              <div class="metric-value" id="res-mass">—</div>
+              <div class="metric-unit">kg</div>
+            </div>
+            <div class="metric-label">±<span id="res-margin">—</span> kg margen de error</div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" id="conf-fill"></div>
+            </div>
+            <div class="confidence-label">
+              <span>Confianza</span>
+              <span id="res-conf">—</span>
+            </div>
+          </div>
+
+          <!-- BCS -->
+          <div class="panel-card">
+            <div class="panel-title">Condición corporal (BCS)</div>
+            <div class="metric-big">
+              <div class="metric-value" id="res-bcs">—</div>
+              <div class="metric-unit">/ 5</div>
+            </div>
+            <div class="bcs-scale" id="bcs-scale">
+              <div class="bcs-pip" id="b1">1</div>
+              <div class="bcs-pip" id="b2">2</div>
+              <div class="bcs-pip" id="b3">3</div>
+              <div class="bcs-pip" id="b4">4</div>
+              <div class="bcs-pip" id="b5">5</div>
+            </div>
+            <div class="bcs-description" id="bcs-desc">—</div>
+          </div>
+
+          <!-- Morphometrics -->
+          <div class="panel-card">
+            <div class="panel-title">Morfometría</div>
+            <div class="morph-grid">
+              <div class="morph-item">
+                <div class="morph-name">Largo corporal</div>
+                <div class="morph-val" id="m-largo">—<span>cm</span></div>
+              </div>
+              <div class="morph-item">
+                <div class="morph-name">Altura a la cruz</div>
+                <div class="morph-val" id="m-altura">—<span>cm</span></div>
+              </div>
+              <div class="morph-item">
+                <div class="morph-name">Perímetro torácico</div>
+                <div class="morph-val" id="m-perim">—<span>cm</span></div>
+              </div>
+              <div class="morph-item">
+                <div class="morph-name">Ancho de cadera</div>
+                <div class="morph-val" id="m-cadera">—<span>cm</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Save -->
+          <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="saveRecord()">
+            💾 Guardar registro
+          </button>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ RECORDS VIEW ══════════════ -->
+  <div class="view" id="view-records">
+    <div class="dashboard-header">
+      <div class="page-title">Registros <span>ganaderos</span></div>
+      <button class="btn btn-ghost" onclick="exportCSV()">↓ Exportar CSV</button>
+    </div>
+
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-lbl">Análisis totales</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-avg-mass">—</div>
+        <div class="stat-lbl">Masa promedio (kg)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-avg-bcs">—</div>
+        <div class="stat-lbl">BCS promedio</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-animals">0</div>
+        <div class="stat-lbl">Animales únicos</div>
+      </div>
+    </div>
+
+    <div class="records-table-wrap">
+      <div class="table-header-bar">
+        <h3>Historial de análisis</h3>
+        <input type="text" class="search-input" placeholder="Buscar ID..." oninput="filterRecords(this.value)">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID Animal</th>
+            <th>Fecha</th>
+            <th>Masa (kg)</th>
+            <th>BCS</th>
+            <th>Raza</th>
+            <th>Lote</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="records-tbody">
+          <tr>
+            <td colspan="7">
+              <div class="placeholder-state">
+                <div class="icon">📋</div>
+                <p>Sin registros aún</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════ EVOLUTION VIEW ══════════════ -->
+  <div class="view" id="view-evolution">
+    <div class="dashboard-header">
+      <div class="page-title">Evolución <span>individual</span></div>
+    </div>
+
+    <div class="evolution-grid">
+      <div class="animal-list-panel">
+        <div class="animal-list-header">📋 Animales</div>
+        <div class="animal-list" id="animal-list-evo">
+          <div class="placeholder-state">
+            <p>Sin registros</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="chart-panel">
+          <div class="chart-title">Evolución de masa <span id="evo-animal-tag">— selecciona un animal</span></div>
+          <svg class="chart" id="mass-chart" viewBox="0 0 600 280">
+            <defs>
+              <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#D4A853" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="#D4A853" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <text x="300" y="140" text-anchor="middle" fill="rgba(245,237,216,0.2)" font-family="JetBrains Mono, monospace" font-size="12">Selecciona un animal</text>
+          </svg>
+        </div>
+
+        <div class="chart-panel" style="margin-top:1rem;">
+          <div class="chart-title">Evolución BCS</div>
+          <svg class="chart" id="bcs-chart" viewBox="0 0 600 200">
+            <text x="300" y="100" text-anchor="middle" fill="rgba(245,237,216,0.2)" font-family="JetBrains Mono, monospace" font-size="12">Selecciona un animal</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Camera Modal -->
+<div class="modal-bg" id="camera-modal">
+  <div class="modal">
+    <div class="modal-title">
+      📷 Captura en vivo
+      <button class="modal-close" onclick="closeCamera()">✕</button>
+    </div>
+    <video id="camera-video" autoplay playsinline></video>
+    <div class="camera-actions">
+      <button class="btn btn-primary" onclick="capturePhoto()" style="flex:1; justify-content:center;">📸 Capturar</button>
+      <button class="btn btn-ghost" onclick="closeCamera()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">✓ Registro guardado</div>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIG API
+// ══════════════════════════════════════════
+const API_BASE = 'http://localhost:8000/api/v1';
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let records = JSON.parse(localStorage.getItem('bovineai_records') || '[]');
+let currentResult = null;
+let currentFile = null;          // Archivo cargado para enviar a la API
+let cameraStream = null;
+let selectedAnimalId = null;
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'records') renderRecords();
+  if (name === 'evolution') renderEvolution();
+}
+
+// ══════════════════════════════════════════
+// FILE HANDLING
+// ══════════════════════════════════════════
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  currentFile = file;
+  loadImageFile(file);
+}
+
+function loadImageFile(file) {
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('preview-img').src = ev.target.result;
+    showPreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function showPreview() {
+  document.getElementById('upload-prompt').style.display = 'none';
+  document.getElementById('preview-container').classList.add('visible');
+  document.getElementById('analyze-btn').disabled = false;
+  document.getElementById('seg-overlay').classList.remove('visible');
+  document.getElementById('keypoints-layer').innerHTML = '';
+}
+
+function resetUpload() {
+  document.getElementById('upload-prompt').style.display = '';
+  document.getElementById('preview-container').classList.remove('visible');
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('file-input').value = '';
+  document.getElementById('results-content').style.display = 'none';
+  document.getElementById('results-placeholder').style.display = 'block';
+  currentResult = null;
+}
+
+// DRAG & DROP
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) { loadImageFile(file); }
+});
+
+// ══════════════════════════════════════════
+// DEMO / SAMPLE
+// ══════════════════════════════════════════
+function loadSample() {
+  // Use a placeholder cattle silhouette
+  const canvas = document.createElement('canvas');
+  canvas.width = 640; canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+  
+  // Background (field)
+  const bg = ctx.createLinearGradient(0, 0, 0, 480);
+  bg.addColorStop(0, '#87CEEB'); bg.addColorStop(0.6, '#90EE90'); bg.addColorStop(1, '#5a8a3c');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 640, 480);
+
+  // Ground
+  ctx.fillStyle = '#5a8a3c'; ctx.fillRect(0, 340, 640, 140);
+
+  // Simple cattle silhouette
+  ctx.fillStyle = '#5C3317';
+  ctx.beginPath(); ctx.ellipse(320, 280, 130, 70, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(430, 240, 50, 38, -0.3, 0, Math.PI*2); ctx.fill();
+  [[230,350,18,80],[270,350,18,80],[350,350,18,80],[390,350,18,80]].forEach(([x,y,w,h]) => {
+    ctx.fillRect(x-w/2, y, w, h);
+  });
+  ctx.strokeStyle = '#8B6914'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(420, 215); ctx.quadraticCurveTo(410, 195, 435, 185); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(445, 210); ctx.quadraticCurveTo(460, 188, 470, 185); ctx.stroke();
+
+  // Convertir canvas a File para poder enviarlo a la API
+  canvas.toBlob((blob) => {
+    currentFile = new File([blob], 'demo_bovino.jpg', { type: 'image/jpeg' });
+    document.getElementById('preview-img').src = canvas.toDataURL();
+    document.getElementById('f-id').value = 'BOV-' + Math.floor(Math.random()*900+100);
+    document.getElementById('f-raza').value = 'Brahman';
+    document.getElementById('f-sexo').value = 'Macho';
+    document.getElementById('f-edad').value = '24 meses';
+    document.getElementById('f-lote').value = 'Lote A';
+    showPreview();
+  }, 'image/jpeg');
+}
+
+// ══════════════════════════════════════════
+// ANALYSIS PIPELINE (simulated)
+// ══════════════════════════════════════════
+async function runAnalysis() {
+  if (!currentFile && !document.getElementById('preview-img').src) {
+    return showToast('Carga una imagen primero', true);
+  }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+
+  const overlay = document.getElementById('proc-overlay');
+  const steps = document.querySelectorAll('.proc-step');
+  overlay.classList.add('active');
+  steps.forEach(s => s.classList.remove('active', 'done'));
+
+  // ── PASO 1: Verificar / crear animal en la API ──────────────────────────
+  steps[0].classList.add('active');
+  await sleep(300);
+
+  const arete = (document.getElementById('f-id').value.trim() || 'BOV-' + Date.now()).toUpperCase();
+  let animalId;
+
+  try {
+    // Intentar crear el animal (si ya existe la API devuelve 409 → lo buscamos)
+    const createRes = await fetch(`${API_BASE}/animals/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        arete,
+        raza: document.getElementById('f-raza').value || null,
+        sexo: document.getElementById('f-sexo').value.toLowerCase() || null,
+        edad: document.getElementById('f-edad').value || null,
+        lote: document.getElementById('f-lote').value || null,
+      }),
+    });
+
+    if (createRes.ok || createRes.status === 201) {
+      const body = await createRes.json();
+      animalId = body.data.id;
+    } else if (createRes.status === 409) {
+      // Animal ya existe — buscarlo por arete (listar y filtrar)
+      const listRes = await fetch(`${API_BASE}/animals/?limit=200`);
+      const listBody = await listRes.json();
+      const found = listBody.data.find(a => a.arete === arete);
+      if (found) animalId = found.id;
+      else throw new Error('No se pudo recuperar el animal existente');
+    } else {
+      throw new Error(`Error al crear animal: ${createRes.status}`);
+    }
+  } catch (e) {
+    overlay.classList.remove('active');
+    btn.disabled = false;
+    return showToast(`Error de conexión: ${e.message}`, true);
+  }
+
+  steps[0].classList.remove('active'); steps[0].classList.add('done');
+
+  // ── PASOS 1-5: Animar mientras la API procesa ───────────────────────────
+  const animDelays = [500, 700, 600, 800, 600];
+  for (let i = 1; i <= 5; i++) {
+    steps[i].classList.add('active');
+    await sleep(animDelays[i - 1]);
+  }
+
+  // ── LLAMADA A LA API: inferencia real ───────────────────────────────────
+  let result;
+  try {
+    const formData = new FormData();
+    formData.append('animal_id', animalId);
+    formData.append('file', currentFile);
+
+    const res = await fetch(`${API_BASE}/analysis/`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.message || `HTTP ${res.status}`);
+    }
+
+    const body = await res.json();
+    result = body.data;
+  } catch (e) {
+    for (let i = 1; i <= 5; i++) { steps[i].classList.remove('active'); }
+    overlay.classList.remove('active');
+    btn.disabled = false;
+    return showToast(`Error en análisis: ${e.message}`, true);
+  }
+
+  // Terminar pasos animados
+  for (let i = 1; i <= 5; i++) { steps[i].classList.remove('active'); steps[i].classList.add('done'); }
+  steps[6].classList.add('active');
+  await sleep(400);
+  steps[6].classList.remove('active'); steps[6].classList.add('done');
+
+  overlay.classList.remove('active');
+
+  // ── Mapear respuesta API → currentResult ───────────────────────────────
+  currentResult = {
+    animalId,
+    arete,
+    analysisId: result.id,
+    mass: Math.round(result.masa.estimada_kg),
+    margin: Math.round(result.masa.margen_error_kg || result.masa.estimada_kg * 0.05),
+    conf: result.masa.confianza || 0.85,
+    bcs: result.bcs.score,
+    largo: result.morfometria.largo_corporal_cm,
+    altura: result.morfometria.altura_cruz_cm,
+    perim: result.morfometria.perimetro_toracico_cm,
+    cadera: result.morfometria.ancho_cadera_cm,
+  };
+
+  showResults(currentResult);
+  drawKeypoints();
+  document.getElementById('seg-overlay').classList.add('visible');
+  btn.disabled = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showResults(r) {
+  document.getElementById('results-placeholder').style.display = 'none';
+  const rc = document.getElementById('results-content');
+  rc.style.display = 'flex';
+  rc.style.flexDirection = 'column';
+  rc.style.gap = '1rem';
+
+  document.getElementById('res-mass').textContent = r.mass;
+  document.getElementById('res-margin').textContent = r.margin;
+  document.getElementById('res-conf').textContent = (r.conf * 100).toFixed(1) + '%';
+  setTimeout(() => { document.getElementById('conf-fill').style.width = (r.conf * 100) + '%'; }, 100);
+
+  document.getElementById('res-bcs').textContent = r.bcs.toFixed(1);
+  const bcsInt = Math.round(r.bcs);
+  for (let i = 1; i <= 5; i++) {
+    const pip = document.getElementById('b' + i);
+    pip.className = 'bcs-pip';
+    if (i === bcsInt) pip.classList.add('active');
+    else if (Math.abs(i - r.bcs) <= 1) pip.classList.add('near');
+  }
+  const bcsDescs = {
+    1: '⚠ Caquéctico — reservas agotadas, atención urgente',
+    2: '⚠ Delgado — falta cobertura muscular y grasa',
+    3: '✓ Moderado — condición aceptable, monitorear',
+    4: '✓ Bueno — excelente estado, nivel óptimo',
+    5: '⚠ Obeso — exceso grasa, riesgo metabólico',
+  };
+  document.getElementById('bcs-desc').textContent = bcsDescs[bcsInt] || '—';
+
+  document.getElementById('m-largo').innerHTML = r.largo + '<span>cm</span>';
+  document.getElementById('m-altura').innerHTML = r.altura + '<span>cm</span>';
+  document.getElementById('m-perim').innerHTML = r.perim + '<span>cm</span>';
+  document.getElementById('m-cadera').innerHTML = r.cadera + '<span>cm</span>';
+}
+
+function drawKeypoints() {
+  const layer = document.getElementById('keypoints-layer');
+  layer.innerHTML = '';
+  const points = [
+    [15, 45], [50, 40], [50, 60], [85, 45], [85, 60], [35, 75], [65, 75]
+  ];
+  setTimeout(() => {
+    points.forEach(([x, y]) => {
+      const dot = document.createElement('div');
+      dot.className = 'keypoint visible';
+      dot.style.left = x + '%';
+      dot.style.top = y + '%';
+      layer.appendChild(dot);
+    });
+  }, 200);
+}
+
+// ══════════════════════════════════════════
+// SAVE RECORD
+// ══════════════════════════════════════════
+function saveRecord() {
+  if (!currentResult) return showToast('Primero analiza una imagen', true);
+  // Los datos ya fueron guardados en PostgreSQL por la API.
+  // Aquí solo actualizamos el estado local para la UI.
+  const record = {
+    id: currentResult.analysisId || Date.now(),
+    animalId: currentResult.arete,
+    date: new Date().toISOString(),
+    mass: currentResult.mass,
+    bcs: currentResult.bcs,
+    conf: currentResult.conf,
+    margin: currentResult.margin,
+    raza: document.getElementById('f-raza').value,
+    sexo: document.getElementById('f-sexo').value,
+    edad: document.getElementById('f-edad').value,
+    lote: document.getElementById('f-lote').value,
+    morph: {
+      largo: currentResult.largo,
+      altura: currentResult.altura,
+      perim: currentResult.perim,
+      cadera: currentResult.cadera,
+    }
+  };
+  records.push(record);
+  localStorage.setItem('bovineai_records', JSON.stringify(records));
+  showToast('✓ Registro en PostgreSQL: ' + currentResult.arete);
+  resetUpload();
+}
+
+// ══════════════════════════════════════════
+// RECORDS VIEW
+// ══════════════════════════════════════════
+function renderRecords(filter = '') {
+  const filtered = records.filter(r => r.animalId.toLowerCase().includes(filter.toLowerCase()));
+  
+  // Stats
+  document.getElementById('stat-total').textContent = records.length;
+  if (records.length) {
+    const avgMass = Math.round(records.reduce((s, r) => s + r.mass, 0) / records.length);
+    const avgBcs = (records.reduce((s, r) => s + r.bcs, 0) / records.length).toFixed(1);
+    const uniqueAnimals = new Set(records.map(r => r.animalId)).size;
+    document.getElementById('stat-avg-mass').textContent = avgMass;
+    document.getElementById('stat-avg-bcs').textContent = avgBcs;
+    document.getElementById('stat-animals').textContent = uniqueAnimals;
+  }
+
+  const tbody = document.getElementById('records-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="placeholder-state"><div class="icon">📋</div><p>Sin registros</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.slice().reverse().map(r => {
+    const bcsInt = Math.round(r.bcs);
+    const d = new Date(r.date);
+    const dateStr = d.toLocaleDateString('es-EC', { day:'2-digit', month:'short', year:'numeric' });
+    const status = r.bcs < 2 ? 'alert' : r.bcs < 3 ? 'warn' : 'ok';
+    const statusLabel = status === 'alert' ? 'Urgente' : status === 'warn' ? 'Atención' : 'Normal';
+    return `<tr onclick="highlightRecord('${r.animalId}')">
+      <td class="td-id">${r.animalId}</td>
+      <td style="color:rgba(245,237,216,0.5)">${dateStr}</td>
+      <td class="td-mass">${r.mass} <span style="font-size:0.65rem;color:rgba(245,237,216,0.35)">±${r.margin}</span></td>
+      <td><span class="bcs-badge bcs-${bcsInt}">${r.bcs.toFixed(1)}</span></td>
+      <td style="color:rgba(245,237,216,0.5)">${r.raza || '—'}</td>
+      <td style="color:rgba(245,237,216,0.5)">${r.lote || '—'}</td>
+      <td><span class="status-dot status-${status}"></span>${statusLabel}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterRecords(val) { renderRecords(val); }
+
+function highlightRecord(animalId) {
+  selectedAnimalId = animalId;
+  document.querySelectorAll('.nav-btn')[2].click();
+  setTimeout(() => selectAnimal(animalId), 100);
+}
+
+// ══════════════════════════════════════════
+// EVOLUTION VIEW
+// ══════════════════════════════════════════
+function renderEvolution() {
+  const animalIds = [...new Set(records.map(r => r.animalId))];
+  const list = document.getElementById('animal-list-evo');
+  
+  if (!animalIds.length) {
+    list.innerHTML = '<div class="placeholder-state"><p>Sin registros</p></div>';
+    return;
+  }
+  list.innerHTML = animalIds.map((id, i) => {
+    const animalRecords = records.filter(r => r.animalId === id);
+    const lastMass = animalRecords[animalRecords.length - 1]?.mass || '—';
+    const emojis = ['🐄','🐂','🐃'];
+    return `<div class="animal-item" id="ai-${id}" onclick="selectAnimal('${id}')">
+      <div class="animal-avatar">${emojis[i % 3]}</div>
+      <div class="animal-info">
+        <div class="animal-tag">${id}</div>
+        <div class="animal-meta">${animalRecords.length} registros · ${lastMass} kg</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (selectedAnimalId) selectAnimal(selectedAnimalId);
+  else if (animalIds.length) selectAnimal(animalIds[0]);
+}
+
+function selectAnimal(id) {
+  selectedAnimalId = id;
+  document.querySelectorAll('.animal-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('ai-' + id);
+  if (el) el.classList.add('active');
+
+  const animalRecords = records.filter(r => r.animalId === id).sort((a, b) => new Date(a.date) - new Date(b.date));
+  document.getElementById('evo-animal-tag').textContent = id;
+  drawMassChart(animalRecords);
+  drawBCSChart(animalRecords);
+}
+
+function drawMassChart(data) {
+  const svg = document.getElementById('mass-chart');
+  if (!data.length) { svg.innerHTML = '<text x="300" y="140" text-anchor="middle" fill="rgba(245,237,216,0.2)" font-family="JetBrains Mono" font-size="12">Sin datos</text>'; return; }
+
+  const W = 600, H = 280, pad = { t: 20, r: 30, b: 40, l: 60 };
+  const masses = data.map(d => d.mass);
+  const minM = Math.min(...masses) * 0.92;
+  const maxM = Math.max(...masses) * 1.08;
+  const toX = (i) => pad.l + (i / Math.max(data.length - 1, 1)) * (W - pad.l - pad.r);
+  const toY = (m) => pad.t + (1 - (m - minM) / (maxM - minM)) * (H - pad.t - pad.b);
+
+  const pts = data.map((d, i) => `${toX(i)},${toY(d.mass)}`).join(' ');
+  const areaBottom = H - pad.b;
+  const areaPath = `M${toX(0)},${areaBottom} ` + data.map((d, i) => `L${toX(i)},${toY(d.mass)}`).join(' ') + ` L${toX(data.length-1)},${areaBottom} Z`;
+
+  // Grid
+  let gridLines = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i / 4) * (H - pad.t - pad.b);
+    const val = Math.round(maxM - (i / 4) * (maxM - minM));
+    gridLines += `<line x1="${pad.l}" y1="${y}" x2="${W - pad.r}" y2="${y}" stroke="rgba(245,237,216,0.06)" stroke-width="1"/>
+      <text x="${pad.l - 6}" y="${y + 4}" text-anchor="end" fill="rgba(245,237,216,0.3)" font-family="JetBrains Mono" font-size="9">${val}</text>`;
+  }
+  
+  // X labels
+  let xLabels = '';
+  data.forEach((d, i) => {
+    const date = new Date(d.date);
+    const lbl = date.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' });
+    xLabels += `<text x="${toX(i)}" y="${H - pad.b + 18}" text-anchor="middle" fill="rgba(245,237,216,0.3)" font-family="JetBrains Mono" font-size="8">${lbl}</text>`;
+  });
+
+  // Dots
+  const dots = data.map((d, i) => `<circle cx="${toX(i)}" cy="${toY(d.mass)}" r="5" fill="#D4A853" stroke="#1A1008" stroke-width="2"/>
+    <title>${d.mass} kg</title>`).join('');
+
+  svg.innerHTML = `
+    <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4A853" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#D4A853" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${gridLines}
+    <path d="${areaPath}" class="chart-area"/>
+    <polyline points="${pts}" class="chart-line"/>
+    ${dots}
+    ${xLabels}
+    <text x="${pad.l - 45}" y="${H/2}" text-anchor="middle" fill="rgba(245,237,216,0.3)" font-family="JetBrains Mono" font-size="9" transform="rotate(-90,${pad.l-45},${H/2})">kg</text>
+  `;
+}
+
+function drawBCSChart(data) {
+  const svg = document.getElementById('bcs-chart');
+  if (!data.length) { svg.innerHTML = '<text x="300" y="100" text-anchor="middle" fill="rgba(245,237,216,0.2)" font-family="JetBrains Mono" font-size="12">Sin datos</text>'; return; }
+
+  const W = 600, H = 200, pad = { t: 15, r: 30, b: 35, l: 55 };
+  const toX = (i) => pad.l + (i / Math.max(data.length - 1, 1)) * (W - pad.l - pad.r);
+  const toY = (v) => pad.t + (1 - (v - 1) / 4) * (H - pad.t - pad.b);
+
+  let gridLines = '';
+  for (let bcs = 1; bcs <= 5; bcs++) {
+    const y = toY(bcs);
+    const col = bcs < 2 ? '#ff5555' : bcs < 3 ? '#D4A853' : bcs < 5 ? '#6B8F71' : '#ff5555';
+    gridLines += `<line x1="${pad.l}" y1="${y}" x2="${W - pad.r}" y2="${y}" stroke="rgba(245,237,216,0.05)" stroke-width="1"/>
+      <text x="${pad.l - 6}" y="${y + 4}" text-anchor="end" fill="${col}" font-family="JetBrains Mono" font-size="9" opacity="0.7">${bcs}</text>`;
+  }
+
+  const pts = data.map((d, i) => `${toX(i)},${toY(d.bcs)}`).join(' ');
+  const dots = data.map((d, i) => {
+    const col = d.bcs < 2 ? '#ff8a8a' : d.bcs < 3 ? '#D4A853' : '#6B8F71';
+    return `<circle cx="${toX(i)}" cy="${toY(d.bcs)}" r="5" fill="${col}" stroke="#1A1008" stroke-width="2"/>`;
+  }).join('');
+
+  let xLabels = data.map((d, i) => {
+    const date = new Date(d.date);
+    const lbl = date.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' });
+    return `<text x="${toX(i)}" y="${H - pad.b + 16}" text-anchor="middle" fill="rgba(245,237,216,0.3)" font-family="JetBrains Mono" font-size="8">${lbl}</text>`;
+  }).join('');
+
+  svg.innerHTML = `${gridLines}
+    <polyline points="${pts}" class="chart-bcs-line"/>
+    ${dots}${xLabels}
+    <text x="${pad.l-40}" y="${H/2}" text-anchor="middle" fill="rgba(245,237,216,0.3)" font-family="JetBrains Mono" font-size="9" transform="rotate(-90,${pad.l-40},${H/2})">BCS</text>`;
+}
+
+// ══════════════════════════════════════════
+// CAMERA
+// ══════════════════════════════════════════
+async function openCamera() {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    document.getElementById('camera-video').srcObject = cameraStream;
+    document.getElementById('camera-modal').classList.add('open');
+  } catch (e) {
+    showToast('No se pudo acceder a la cámara', true);
+  }
+}
+function closeCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  document.getElementById('camera-modal').classList.remove('open');
+}
+function capturePhoto() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  document.getElementById('preview-img').src = canvas.toDataURL('image/jpeg');
+  closeCamera();
+  showPreview();
+}
+
+// ══════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════
+function exportCSV() {
+  if (!records.length) return showToast('Sin datos para exportar', true);
+  const header = ['ID Animal', 'Fecha', 'Masa (kg)', 'Margen', 'BCS', 'Confianza', 'Raza', 'Sexo', 'Edad', 'Lote', 'Largo', 'Altura', 'Perimetro', 'Cadera'];
+  const rows = records.map(r => [
+    r.animalId, new Date(r.date).toLocaleString('es-EC'),
+    r.mass, r.margin, r.bcs, (r.conf * 100).toFixed(1) + '%',
+    r.raza, r.sexo, r.edad, r.lote,
+    r.morph?.largo, r.morph?.altura, r.morph?.perim, r.morph?.cadera
+  ]);
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = 'bovineai_registros_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+  showToast('✓ CSV exportado');
+}
+
+// ══════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════
+let toastTimer;
+function showToast(msg, error = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (error ? ' error' : '');
+  setTimeout(() => t.classList.add('show'), 10);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

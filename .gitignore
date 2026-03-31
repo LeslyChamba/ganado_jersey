@@ -1,0 +1,28 @@
+# Dependencias de Node
+node_modules/
+dist/
+npm-debug.log*
+
+# Entornos virtuales de Python (por si acaso)
+venv/
+.env
+
+# Archivos pesados de datos e imágenes
+*.jpg
+*.png
+*.jpeg
+*mp4
+*ini
+*csv
+*txt
+__pycache__/
+*.pyc
+*.pth
+*.pt
+/Jersey-Prediccion/models_pt/
+/Jersey-Prediccion/debug_batch/
+/Jersey-Prediccion/debug_lateral/
+/Jersey-Prediccion/fotos_vacas/
+/Jersey-Prediccion/debug_pt_rob/
+/dataset/
+/venv/

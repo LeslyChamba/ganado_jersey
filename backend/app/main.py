@@ -1,0 +1,130 @@
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.core.config import settings
+from app.db.database import engine, Base
+from app.controllers.auth_controller import router as auth_router
+from app.controllers.animal_controller import hato_router, animal_router
+from app.controllers.analisis_controller import router as analisis_router
+from app.controllers.reportes_controller import router as reporte_router
+logging.basicConfig(
+    level=logging.DEBUG if settings.DEBUG else logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("jer-weight")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(f"Iniciando JER-WEIGHT v{settings.APP_VERSION}")
+
+    if settings.ENVIRONMENT == "development":
+        # Solo como fallback rápido en dev — en producción usar: alembic upgrade head
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Tablas verificadas (dev mode)")
+
+    Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
+    logger.info(f"📁 Directorio de imágenes: {settings.UPLOAD_DIR}")
+
+    yield
+
+    logger.info("🛑 Apagando JER-WEIGHT...")
+
+app = FastAPI(
+    title="JER-WEIGHT API",
+    description="""
+## JER-WEIGHT — Sistema de Estimación de Peso en Vacas Jersey
+
+Estima el **peso corporal** y **condición corporal (BCS)** de vacas Jersey
+mediante análisis de imágenes con visión por computadora.
+
+### Flujo principal:
+1. Registra el ganadero y su hato
+2. Registra las vacas con su arete
+3. Toma foto lateral + trasera
+4. Obtén peso estimado y BCS al instante
+
+### Tecnologías:
+- **Segmentación**: SAM (Segment Anything Model)
+- **BCS**: YOLOv8 (foto trasera)
+- **Morfometría**: OpenCV
+- **Estimación**: XGBoost + Fórmula calibrada Jersey
+    """,
+    version=settings.APP_VERSION,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS_LIST,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+
+API_PREFIX = "/api/v1"
+app.include_router(auth_router,     prefix=API_PREFIX)
+app.include_router(hato_router,     prefix=API_PREFIX)
+app.include_router(animal_router,   prefix=API_PREFIX)
+app.include_router(analisis_router, prefix=API_PREFIX)
+app.include_router(reporte_router,  prefix=API_PREFIX)
+
+@app.get("/", tags=["Sistema"])
+def raiz():
+    return {
+        "sistema": "JER-WEIGHT",
+        "descripcion": "Estimación de Peso en Vacas Jersey",
+        "version": settings.APP_VERSION,
+        "estado": "activo",
+        "docs": "/docs",
+    }
+
+
+@app.get("/health", tags=["Sistema"])
+def health_check():
+    from sqlalchemy import text
+    from app.db.database import SessionLocal
+    db_ok = False
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db_ok = True
+        db.close()
+    except Exception:
+        pass
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "sistema": "JER-WEIGHT",
+        "database": "conectada" if db_ok else "sin conexión",
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+    }
+@app.get("/api/v1/health", tags=["Sistema"])  # ← agregar esta ruta
+def health_check_v1():
+    from sqlalchemy import text
+    from app.db.database import SessionLocal
+    db_ok = False
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db_ok = True
+        db.close()
+    except Exception:
+        pass
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": "conectada" if db_ok else "sin conexión",
+    }
+
+
