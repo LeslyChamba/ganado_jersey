@@ -8,20 +8,18 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
-from sqlalchemy import event
-from app.core.encryption import encrypt, decrypt
 from app.db.database import Base
 
 
 # ─── Enumeraciones ──────────────────────────────────────────────────────────
 
 class RolUsuario(str, enum.Enum):
-    ADMIN = "admin"
+    ADMIN    = "admin"
     GANADERO = "ganadero"
-    
+
 class PropositoAnimal(str, enum.Enum):
-    CARNE = "carne"
-    LECHE = "leche"
+    CARNE          = "carne"
+    LECHE          = "leche"
     DOBLE_PROPOSITO = "doble_proposito"
 
 class TipoReporte(str, enum.Enum):
@@ -51,8 +49,8 @@ class Usuario(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    email: Mapped[str] = mapped_column(String(500), unique=True, nullable=False, index=False)
-    nombre: Mapped[str] = mapped_column(String(500), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     apellido: Mapped[str] = mapped_column(String(100), nullable=False)
     telefono: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -75,27 +73,11 @@ class Usuario(Base):
     )
 
     hatos: Mapped[List["Hato"]] = relationship("Hato", back_populates="propietario")
-    @property
-    def email_legible(self) -> str:
-        return decrypt(self.email)
 
-    @property
-    def nombre_legible(self) -> str:
-        return decrypt(self.nombre)
     def __repr__(self):
         return f"<Usuario {self.email} ({self.rol})>"
 
-def _ya_encriptado(valor: str) -> bool:
-    return valor is not None and valor.startswith("gAAAA")
 
-@event.listens_for(Usuario, "before_insert")
-@event.listens_for(Usuario, "before_update")
-def encriptar_pii_usuario(mapper, connection, target: Usuario):
-    if target.email and not _ya_encriptado(target.email):
-        target.email = encrypt(target.email)
-    if target.nombre and not _ya_encriptado(target.nombre):
-        target.nombre = encrypt(target.nombre)
-   
 # ─── Schema: ganaderia ──────────────────────────────────────────────────────
 
 class Hato(Base):
@@ -183,12 +165,6 @@ class Medicion(Base):
     )
     notas: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
-    @property
-    def notas_legibles(self) -> Optional[str]:
-        if not self.notas:
-            return None
-        return decrypt(self.notas)
-
     animal_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("ganaderia.animales.id"), nullable=False, index=True
     )
@@ -197,12 +173,7 @@ class Medicion(Base):
 
     def __repr__(self):
         return f"<Medicion {self.animal_id} | {self.peso_estimado_kg}kg BCS:{self.bcs}>"
-# ── Encriptar notas de medición antes de INSERT y UPDATE ────────────────────
-@event.listens_for(Medicion, "before_insert")
-@event.listens_for(Medicion, "before_update")
-def encriptar_notas_medicion(mapper, connection, target: Medicion):
-    if target.notas and not _ya_encriptado(target.notas):
-        target.notas = encrypt(target.notas)
+
 
 # ─── Schema: reportes ───────────────────────────────────────────────────────
 
@@ -258,10 +229,7 @@ class AuditoriaLog(Base):
     usuario_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("auth.usuarios.id"), nullable=True
     )
-    usuario_email: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
-    # values_callable fuerza que se guarde 'login' en vez de 'LOGIN'
+    usuario_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     accion: Mapped[AccionAuditoria] = mapped_column(
         SQLEnum(AccionAuditoria, values_callable=lambda x: [e.value for e in x]),
         nullable=False, index=True

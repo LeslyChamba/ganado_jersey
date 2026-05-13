@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from app.models.models import RolUsuario, PropositoAnimal
-from app.core.encryption import decrypt
+from pydantic import BaseModel, EmailStr, Field
+from app.models.models import RolUsuario, PropositoAnimal, TipoReporte, FormatoReporte
+
 
 # ════════════════════════════════════════════════════════
 #  USUARIO
@@ -33,14 +33,6 @@ class UsuarioResponse(BaseModel):
     rol: RolUsuario
     activo: bool
     created_at: datetime
-
-    @field_validator("email", "nombre", mode="before")
-    @classmethod
-    def desencriptar(cls, v):
-        try:
-            return decrypt(v)
-        except Exception:
-            return v
 
     model_config = {"from_attributes": True}
 
@@ -131,18 +123,6 @@ class AnimalResponse(BaseModel):
     ultimo_bcs: Optional[float] = None
     created_at: datetime
 
-    @field_validator("notas", mode="before")
-    @classmethod
-    def desencriptar_notas_animal(cls, v):
-        if not v:
-            return v
-        try:
-            # Si el dato viene de la BD encriptado, lo limpiamos para el usuario
-            return decrypt(v)
-        except Exception:
-            # Si no está encriptado (datos viejos), devolvemos el texto tal cual
-            return v
-        
     model_config = {"from_attributes": True}
 
 
@@ -183,18 +163,8 @@ class MedicionResponse(BaseModel):
     fecha_medicion: datetime
     notas: Optional[str]
 
-    @field_validator("notas", mode="before")
-    @classmethod
-    def desencriptar_notas(cls, v):
-        if not v:
-            return v
-        try:
-            return decrypt(v)
-        except Exception:
-            return v
+    model_config = {"from_attributes": True}
 
-    class Config:
-        from_attributes = True
 
 class MedicionDetalle(MedicionResponse):
     animal: Optional[AnimalResponse] = None
@@ -234,11 +204,11 @@ class EstadisticasHato(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     code: Optional[str] = None
+
+
 # ════════════════════════════════════════════════════════
 #  REPORTE
 # ════════════════════════════════════════════════════════
-
-from app.models.models import TipoReporte, FormatoReporte
 
 class ReporteCreate(BaseModel):
     titulo: str = Field(min_length=1, max_length=200)
@@ -264,24 +234,22 @@ class ReporteResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class ValidacionFotoOut(BaseModel):
-    """Resultado de validar UNA fotografía."""
     es_valida:           bool
     animal_detectado:    bool
-    confianza_deteccion: float = Field(ge=0.0, le=1.0, description="Confianza YOLOv8 (0-1)")
-    area_cobertura:      float = Field(ge=0.0, le=1.0, description="Proporción del área de imagen ocupada por el animal")
+    confianza_deteccion: float = Field(ge=0.0, le=1.0)
+    area_cobertura:      float = Field(ge=0.0, le=1.0)
     posicion_correcta:   bool
-    motivo:              str   = Field(description="Mensaje legible para el usuario")
-    sugerencia:          str   = Field(description="Acción correctiva si la foto no es válida")
- 
+    motivo:              str
+    sugerencia:          str
+
     model_config = {"from_attributes": True}
- 
- 
+
+
 class ValidacionParOut(BaseModel):
-    """Resultado de validar el PAR lateral + trasera."""
     lateral:    ValidacionFotoOut
     trasera:    ValidacionFotoOut
-    par_valido: bool = Field(description="True solo si AMBAS fotos son válidas")
- 
+    par_valido: bool
+
     model_config = {"from_attributes": True}
- 
