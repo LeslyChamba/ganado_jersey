@@ -16,10 +16,10 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Descarga de modelos desde Hugging Face
 # Esto sobreescribe las rutas locales con las rutas temporales de descarga
-MASS_MODEL = hf_hub_download(repo_id=REPO_ID, filename="mass_model_v3.json", token=HF_TOKEN)
-FEAT_FILE  = hf_hub_download(repo_id=REPO_ID, filename="feature_names_v3.txt", token=HF_TOKEN)
-BCS_MODEL  = hf_hub_download(repo_id=REPO_ID, filename="best.pt", token=HF_TOKEN)
-
+# DESPUÉS
+MASS_MODEL = Path(hf_hub_download(repo_id=REPO_ID, filename="mass_model_v3.json", token=HF_TOKEN))
+FEAT_FILE  = Path(hf_hub_download(repo_id=REPO_ID, filename="feature_names_v3.txt", token=HF_TOKEN))
+BCS_MODEL  = Path(hf_hub_download(repo_id=REPO_ID, filename="best.pt", token=HF_TOKEN))
 
 PESO_MIN_KG = 280.0
 PESO_MAX_KG = 750.0
