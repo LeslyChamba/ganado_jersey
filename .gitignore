@@ -24,13 +24,12 @@ Thumbs.db
 
 # --- Datos y Multimedia (Para que el repo no sea pesado) ---
 *.jpg
-*.png
 *.jpeg
 *.mp4
 *.csv
 *.ini
 # NO bloqueamos .txt para permitir requirements.txt
-
+!frontend/src/img/*.png
 # --- Carpetas de Datos de Tesis ---
 /dataset/
 /Jersey-Prediccion/debug_*/
