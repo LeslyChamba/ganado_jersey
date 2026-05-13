@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Seguridad
-    SECRET_KEY: str = "e15976ade912b6a127ec57cf44f475a9becdd2d0d7a2d2b4f6c844f7c4502a16"
-    ALGORITHM: str = "HS256"
+    SECRET_KEY: str
+    ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     DB_PORT: int = 5432
     DB_NAME: str = "vacasTesis"
     DB_USER: str = "postgres"
-    DB_PASSWORD: str = "vacas2026"
+    DB_PASSWORD: str 
 
     # Alias opcionales (por compatibilidad)
     POSTGRES_USER: str = ""
