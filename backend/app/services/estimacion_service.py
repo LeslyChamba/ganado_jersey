@@ -1,31 +1,25 @@
-"""
-JER-WEIGHT — Estimacion Service  v3.0.0
-  XGBoost reentrenado (mass_model_v3.json) + Fórmula morfométrica calibrada
-  BCS predicho con YOLOv8 (best.pt) desde imagen trasera
-
-Cambios v3.0 vs v2.5:
-  - Fórmula calibrada con datos reales Jersey (RMSE: 73.6 → 23.9 kg)
-  - XGBoost reentrenado con 8 features optimizadas (RMSE CV: 9.7 kg)
-  - Blend ponderado por RMSE real: 14% fórmula / 86% XGBoost
-  - lc_real ahora es regresión continua (ya no salto discreto)
-  - Intervalo de confianza dinámico basado en RMSE validado
-"""
 import logging
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Optional, Tuple
-
+from huggingface_hub import hf_hub_download
+import os
 from app.schemas.schemas import MorfometriaData
 
 logger = logging.getLogger(__name__)
 
 # ── Rutas relativas al archivo ─────────────────────────────────────────────
-PROYECTO_DIR = Path(__file__).resolve().parent.parent.parent
-MODELS_DIR   = PROYECTO_DIR / "models_pt"
-MASS_MODEL   = MODELS_DIR / "mass_model_v3.json"   # ← nuevo modelo
-FEAT_FILE    = MODELS_DIR / "feature_names_v3.txt"
-BCS_MODEL    = MODELS_DIR / "best.pt"
+# --- Configuración de Hugging Face ---
+REPO_ID = "lesly15/Peso"
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+# Descarga de modelos desde Hugging Face
+# Esto sobreescribe las rutas locales con las rutas temporales de descarga
+MASS_MODEL = hf_hub_download(repo_id=REPO_ID, filename="mass_model_v3.json", token=HF_TOKEN)
+FEAT_FILE  = hf_hub_download(repo_id=REPO_ID, filename="feature_names_v3.txt", token=HF_TOKEN)
+BCS_MODEL  = hf_hub_download(repo_id=REPO_ID, filename="best.pt", token=HF_TOKEN)
+
 
 PESO_MIN_KG = 280.0
 PESO_MAX_KG = 750.0
