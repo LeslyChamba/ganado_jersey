@@ -8,10 +8,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db.database import engine, Base
+from app.controllers.admin_controller import router as admin_router
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.animal_controller import hato_router, animal_router
 from app.controllers.analisis_controller import router as analisis_router
 from app.controllers.reportes_controller import router as reporte_router
+from app.controllers.dashboard_controller import router as dashboard_router
+from app.controllers.bovinos_controller import router as bovinos_router
+from app.core.model_loader import descargar_modelos
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -23,7 +27,8 @@ logger = logging.getLogger("jer-weight")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Iniciando JER-WEIGHT v{settings.APP_VERSION}")
-
+         # ✅ Descargar modelos al arrancar
+    descargar_modelos()
     if settings.ENVIRONMENT == "development":
         # Solo como fallback rápido en dev — en producción usar: alembic upgrade head
         Base.metadata.create_all(bind=engine)
@@ -74,13 +79,14 @@ Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 API_PREFIX = "/api/v1"
-app.include_router(auth_router,     prefix=API_PREFIX)
-app.include_router(hato_router,     prefix=API_PREFIX)
-app.include_router(animal_router,   prefix=API_PREFIX)
-app.include_router(analisis_router, prefix=API_PREFIX)
-app.include_router(reporte_router,  prefix=API_PREFIX)
-
-@app.get("/", tags=["Sistema"])
+app.include_router(auth_router,      prefix=API_PREFIX)
+app.include_router(admin_router,     prefix=API_PREFIX)
+app.include_router(hato_router,      prefix=API_PREFIX)
+app.include_router(animal_router,    prefix=API_PREFIX)
+app.include_router(analisis_router,  prefix=API_PREFIX)
+app.include_router(reporte_router,   prefix=API_PREFIX)
+app.include_router(bovinos_router, prefix=API_PREFIX)
+app.include_router(dashboard_router, prefix=API_PREFIX)
 def raiz():
     return {
         "sistema": "JER-WEIGHT",
@@ -126,5 +132,6 @@ def health_check_v1():
         "status": "ok" if db_ok else "degraded",
         "database": "conectada" if db_ok else "sin conexión",
     }
+
 
 

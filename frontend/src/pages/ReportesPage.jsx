@@ -1,256 +1,226 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { reportesApi, hatosApi, animalesApi } from '../services/api'
-import { formatFechaHora } from '../services/helpers'
-import toast from 'react-hot-toast'
-import { FileText, Trash2, Plus, X, ChevronDown, Download } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { reportesApi, hatosApi } from '../services/api'
+import { formatFecha } from '../services/helpers'
+import { FileText, Download, BarChart2, Weight, TrendingUp, AlertTriangle, Calendar, Filter, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
-const TIPOS    = ['individual', 'hato', 'general']
-const FORMATOS = ['pdf', 'excel']
-
-function BadgeTipo({ tipo }) {
-  const colors = {
-    individual: { bg: '#EAF4EE', text: '#2E4D38' },
-    hato:       { bg: '#F5E6CC', text: '#7A4A10' },
-    general:    { bg: '#E8EEF5', text: '#1E3F6E' },
-  }
-  const c = colors[tipo] || colors.general
-  return (
-    <span className="font-mono text-xs px-2 py-0.5 rounded-lg capitalize"
-      style={{ background: c.bg, color: c.text }}>{tipo}</span>
-  )
+/* ── Tokens de color de la marca JER-WEIGHT ── */
+const C = {
+  primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
+  textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444'
 }
 
-function ModalNuevoReporte({ onClose, hatos, animales }) {
-  const qc = useQueryClient()
-  const [titulo,     setTitulo]     = useState('')
-  const [tipo,       setTipo]       = useState('individual')
-  const [formato,    setFormato]    = useState('pdf')
-  const [hatoId,     setHatoId]     = useState('')
-  const [animalId,   setAnimalId]   = useState('')
-  const [fechaDesde, setFechaDesde] = useState('')
-  const [fechaHasta, setFechaHasta] = useState('')
-
-  const crear = useMutation({
-    mutationFn: () => reportesApi.crear({
-      titulo:      titulo || `Reporte ${tipo} — ${new Date().toLocaleDateString('es-EC')}`,
-      tipo,
-      formato,
-      hato_id:     hatoId     || null,
-      animal_id:   animalId   || null,
-      fecha_desde: fechaDesde || null,
-      fecha_hasta: fechaHasta || null,
-    }),
-    onSuccess: () => { qc.invalidateQueries(['reportes']); toast.success('Reporte generado'); onClose() },
-    onError:   (e) => toast.error(e.response?.data?.detail || 'Error al generar reporte'),
-  })
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-         style={{ background: 'rgba(26,26,26,0.45)', backdropFilter: 'blur(6px)' }}>
-      <div className="w-full max-w-md animate-slide-up"
-           style={{ background: '#FFFFFF', border: '0.5px solid #D0C5B0', borderRadius: 20, boxShadow: '0 8px 40px rgba(46,77,56,0.12)' }}>
-        <div className="flex items-center justify-between px-6 py-4"
-             style={{ borderBottom: '0.5px solid #E8E0D0' }}>
-          <h2 style={{ fontFamily: 'Syne, sans-serif', color: '#1A1A1A', fontSize: '1.2rem', fontWeight: 700 }}>
-            Nuevo reporte
-          </h2>
-          <button onClick={onClose} style={{ color: '#B0A090' }}><X size={18} /></button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="label">Título (opcional)</label>
-            <input className="input" placeholder="Se genera automáticamente si se deja vacío"
-              value={titulo} onChange={e => setTitulo(e.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Tipo</label>
-              <div className="relative">
-                <select className="input appearance-none pr-8" value={tipo}
-                  onChange={e => { setTipo(e.target.value); setHatoId(''); setAnimalId('') }}>
-                  {TIPOS.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-                </select>
-                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: '#B0A090' }} />
-              </div>
-            </div>
-            <div>
-              <label className="label">Formato</label>
-              <div className="relative">
-                <select className="input appearance-none pr-8" value={formato}
-                  onChange={e => setFormato(e.target.value)}>
-                  {FORMATOS.map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
-                </select>
-                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: '#B0A090' }} />
-              </div>
-            </div>
-          </div>
-
-          {(tipo === 'hato' || tipo === 'individual') && (
-            <div>
-              <label className="label">Hato {tipo === 'hato' ? '*' : '(opcional)'}</label>
-              <div className="relative">
-                <select className="input appearance-none pr-8" value={hatoId}
-                  onChange={e => { setHatoId(e.target.value); setAnimalId('') }}>
-                  <option value="">— Todos los hatos</option>
-                  {hatos.map(h => <option key={h.id} value={h.id}>{h.nombre} · {h.finca}</option>)}
-                </select>
-                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: '#B0A090' }} />
-              </div>
-            </div>
-          )}
-
-          {tipo === 'individual' && (
-            <div>
-              <label className="label">Vaca (opcional)</label>
-              <div className="relative">
-                <select className="input appearance-none pr-8" value={animalId}
-                  onChange={e => setAnimalId(e.target.value)}>
-                  <option value="">— Todas las vacas</option>
-                  {animales
-                    .filter(a => !hatoId || a.hato_id === hatoId)
-                    .map(a => <option key={a.id} value={a.id}>{a.arete}{a.nombre ? ` — ${a.nombre}` : ''}</option>)}
-                </select>
-                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: '#B0A090' }} />
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Desde (opcional)</label>
-              <input type="date" className="input" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Hasta (opcional)</label>
-              <input type="date" className="input" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">
-              Cancelar
-            </button>
-            <button type="button" onClick={() => crear.mutate()} disabled={crear.isPending}
-              className="btn-primary flex-1 justify-center">
-              {crear.isPending
-                ? <div className="w-4 h-4 border-2 rounded-full animate-spin"
-                       style={{ borderColor: 'white', borderTopColor: 'transparent' }} />
-                : <><FileText size={14} /> Generar</>
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+// ─── Descarga un blob como archivo ────────────────────────────────────────
+function descargarBlob(blob, nombreArchivo) {
+  const url  = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href        = url
+  link.download    = nombreArchivo
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
 }
+
+// ─── Tipos de reporte disponibles ─────────────────────────────────────────
+const REPORTES = [
+  { id: 'bcs', tipoDb: 'GENERAL', icon: BarChart2, title: 'Reporte BCS General', desc: 'Condición corporal de todos los animales registrados.', bcs_min: 1, bcs_max: 5 },
+  { id: 'pesos', tipoDb: 'GENERAL', icon: Weight, title: 'Reporte de Pesos', desc: 'Evolución histórica de peso por animal y por hato.', bcs_min: undefined, bcs_max: undefined },
+  { id: 'alertas', tipoDb: 'GENERAL', icon: AlertTriangle, title: 'Animales en Alerta', desc: 'Listado de animales con BCS fuera del rango recomendado (< 2.5).', bcs_min: 1, bcs_max: 2.49 },
+  { id: 'tendencias', tipoDb: 'GENERAL', icon: TrendingUp, title: 'Tendencias Mensuales', desc: 'Comparativa de mediciones y BCS agrupadas por mes.', bcs_min: undefined, bcs_max: undefined },
+]
 
 export default function ReportesPage() {
-  const qc = useQueryClient()
-  const [modalAbierto, setModalAbierto] = useState(false)
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [hatoSeleccionado, setHatoSeleccionado] = useState('')
+  const [raza, setRaza]             = useState('')
+  const [loading, setLoading]       = useState(null)
+  const [toastMsg, setToastMsg]     = useState(null)
 
-  const { data: reportes = [], isLoading } = useQuery({
-    queryKey: ['reportes'],
-    queryFn: () => reportesApi.listar().then(r => r.data),
+  const { data: hatos = [] } = useQuery({
+    queryKey: ['hatos'],
+    queryFn:  () => hatosApi.listar().then(r => r.data),
   })
-  const { data: hatos    = [] } = useQuery({ queryKey: ['hatos'],    queryFn: () => hatosApi.listar().then(r => r.data)    })
-  const { data: animales = [] } = useQuery({ queryKey: ['animales'], queryFn: () => animalesApi.listar().then(r => r.data) })
 
-  const eliminar = useMutation({
-    mutationFn: (id) => reportesApi.eliminar(id),
-    onSuccess: () => { qc.invalidateQueries(['reportes']); toast.success('Reporte eliminado') },
-    onError:   () => toast.error('No se pudo eliminar'),
+  const { data: historial = [], refetch: refetchHistorial } = useQuery({
+    queryKey: ['reportes-historial'],
+    queryFn:  () => reportesApi.historial().then(r => r.data),
   })
+
+  function mostrarToast(msg, tipo = 'ok') {
+    setToastMsg({ msg, tipo })
+    setTimeout(() => setToastMsg(null), 3500)
+  }
+
+  async function handleExportar(reporte) {
+    setLoading(reporte.id)
+    try {
+      const params = {
+        titulo:      reporte.title,
+        ...(fechaDesde && { fecha_desde: new Date(fechaDesde).toISOString() }),
+        ...(fechaHasta && { fecha_hasta: new Date(fechaHasta + 'T23:59:59').toISOString() }),
+        ...(hatoSeleccionado && { hato_id: hatoSeleccionado }),
+        ...(raza && { raza }),
+        ...(reporte.bcs_min !== undefined && { bcs_min: reporte.bcs_min }),
+        ...(reporte.bcs_max !== undefined && { bcs_max: reporte.bcs_max }),
+      }
+      const res = await reportesApi.exportarPdf(params)
+      const fecha = new Date().toISOString().slice(0,10).replace(/-/g,'')
+      descargarBlob(res.data, `${reporte.id}_${fecha}.pdf`)
+      mostrarToast('PDF descargado correctamente')
+      refetchHistorial()
+    } catch (e) {
+      const msg = e.response?.data?.detail || 'Error al generar el PDF'
+      mostrarToast(msg, 'error')
+    } finally {
+      setLoading(null)
+    }
+   
+  }
+   const hoy = new Date();
+  const fechaActualLocal = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split('T')[0];
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto space-y-6 relative z-10">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', color: '#1A1A1A', fontSize: '1.75rem', fontWeight: 900 }}>
-            Reportes
-          </h1>
-          <p className="font-mono text-xs mt-1" style={{ color: '#8B7D6B' }}>
-            {reportes.length} REPORTE{reportes.length !== 1 ? 'S' : ''}
-          </p>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8 relative z-10">
+
+      {/* TOAST PERSONALIZADO */}
+      {toastMsg && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl animate-in slide-in-from-top-4 fade-in duration-300"
+          style={{
+            background: toastMsg.tipo === 'error' ? '#FEF2F2' : C.primary,
+            border: `1px solid ${toastMsg.tipo === 'error' ? '#FCA5A5' : C.accentDark}`,
+          }}>
+          {toastMsg.tipo === 'error' ? <XCircle size={20} color={C.danger} /> : <CheckCircle2 size={20} color={C.accent} />}
+          <span className="font-mono text-xs font-bold uppercase tracking-wider" style={{ color: toastMsg.tipo === 'error' ? C.danger : C.white }}>
+            {toastMsg.msg}
+          </span>
         </div>
-        <button onClick={() => setModalAbierto(true)} className="btn-primary">
-          <Plus size={14} /> Nuevo reporte
-        </button>
+      )}
+
+      {/* HEADER */}
+      <div>
+        <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+          Generador de Reportes
+        </h1>
+        <p className="font-mono text-[11px] mt-2 font-bold tracking-widest uppercase" style={{ color: C.textSecondary }}>
+          Exporta y analiza los datos del criadero en PDF
+        </p>
       </div>
 
-      {isLoading ? (
-        <div className="card p-8 flex items-center justify-center">
-          <div className="w-5 h-5 border-2 rounded-full animate-spin"
-               style={{ borderColor: '#89B99A', borderTopColor: 'transparent' }} />
+      {/* FILTROS DE REPORTE */}
+      <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-emerald-50">
+        <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest mb-5" style={{ color: C.accentDark }}>
+          <Filter size={14} /> Filtros de Exportación
         </div>
-      ) : reportes.length === 0 ? (
-        <div className="card p-10 flex flex-col items-center gap-3" style={{ opacity: 0.6 }}>
-          <FileText size={32} style={{ color: '#89B99A' }} />
-          <div className="font-mono text-xs text-center" style={{ color: '#B0A090' }}>
-            No hay reportes generados.<br />Crea el primero con el botón de arriba.
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div>
+            <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Desde la fecha</label>
+            <input type="date" max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: 'JetBrains Mono' }} value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} />
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Hasta la fecha</label>
+            <input type="date" min={fechaDesde} max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: 'JetBrains Mono' }} value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} />
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Ubicación / Hato</label>
+            <select className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all font-sans font-medium" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary }} value={hatoSeleccionado} onChange={e => setHatoSeleccionado(e.target.value)}>
+              <option value="">— Todos los hatos —</option>
+              {hatos.map(h => <option key={h.id} value={h.id}>{h.nombre} — {h.finca}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Filtrar por Raza</label>
+            <input type="text" placeholder="Ej: Jersey" className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary }} value={raza} onChange={e => setRaza(e.target.value)} />
           </div>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {reportes.map(r => (
-            <div key={r.id} className="card p-4 flex items-center gap-4">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                   style={{ background: r.formato === 'pdf' ? '#FDECEA' : '#EAF4EE' }}>
-                <FileText size={16} style={{ color: r.formato === 'pdf' ? '#C0392B' : '#5C8B6A' }} />
-              </div>
+      </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-sm truncate" style={{ color: '#1A1A1A' }}>{r.titulo}</span>
-                  <BadgeTipo tipo={r.tipo} />
-                  <span className="font-mono text-xs px-2 py-0.5 rounded-lg uppercase"
-                    style={{ background: '#F5F0E8', color: '#8B7D6B' }}>
-                    {r.formato}
-                  </span>
-                </div>
-                <div className="font-mono text-xs mt-0.5" style={{ color: '#B0A090' }}>
-                  {formatFechaHora(r.fecha_generado)}
-                </div>
-              </div>
+      {/* TARJETAS DE REPORTE */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {REPORTES.map((r, i) => {
+          const Icon = r.icon
+          const esCargando = loading === r.id
+          return (
+            <div key={r.id} 
+              className="bg-white rounded-[1.5rem] p-6 flex flex-col transition-all duration-300 relative overflow-hidden group"
+              style={{ boxShadow: '0 10px 30px rgba(8, 28, 17, 0.04)', border: '1px solid rgba(82, 217, 160, 0.15)', animationDelay: `${i * 100}ms` }}>
+              
+              <div className="absolute top-0 left-0 w-full h-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: `linear-gradient(90deg, ${C.accent}, ${C.accentDark})` }} />
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {r.url_archivo && (
-                  <a href={r.url_archivo} target="_blank" rel="noreferrer"
-                    className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-                    style={{ background: '#F5E6CC', color: '#C8914A' }}
-                    onMouseOver={e => e.currentTarget.style.background = '#EDD5A8'}
-                    onMouseOut={e  => e.currentTarget.style.background = '#F5E6CC'}>
-                    <Download size={14} />
-                  </a>
-                )}
-                <button
-                  onClick={() => { if (window.confirm('¿Eliminar este reporte?')) eliminar.mutate(r.id) }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-                  style={{ background: '#FDECEA', color: '#C0392B' }}
-                  onMouseOver={e => e.currentTarget.style.background = '#F9C8C5'}
-                  onMouseOut={e  => e.currentTarget.style.background = '#FDECEA'}>
-                  <Trash2 size={14} />
-                </button>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner" style={{ background: '#E8F8F1' }}>
+                  <Icon size={20} style={{ color: C.accentDark }} />
+                </div>
+                <span className="font-mono text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold" style={{ background: '#E8F8F1', color: C.accentDark }}>
+                  Formato PDF
+                </span>
               </div>
+              
+              <div className="flex-1 mb-6">
+                <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>
+                  {r.title}
+                </h3>
+                <p className="font-sans text-sm font-medium" style={{ color: C.textSecondary, lineHeight: 1.6 }}>
+                  {r.desc}
+                </p>
+              </div>
+              
+              <button onClick={() => handleExportar(r)} disabled={esCargando}
+                className="w-full py-3.5 rounded-xl font-mono text-sm font-bold uppercase tracking-widest text-white transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 shadow-md"
+                style={{ background: C.primary }}>
+                {esCargando 
+                  ? <><Loader2 size={16} className="animate-spin" style={{ color: C.accent }} /> Generando...</> 
+                  : <><Download size={16} style={{ color: C.accent }} /> Exportar Documento</>
+                }
+              </button>
             </div>
-          ))}
-        </div>
-      )}
+          )
+        })}
+      </div>
 
-      {modalAbierto && (
-        <ModalNuevoReporte
-          onClose={() => setModalAbierto(false)}
-          hatos={hatos}
-          animales={animales}
-        />
-      )}
+      {/* HISTORIAL DE REPORTES GENERADOS */}
+      <div className="bg-white rounded-[1.5rem] shadow-sm border border-emerald-50 overflow-hidden">
+        <div className="px-8 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(8,28,17,0.05)', background: '#F9FDFB' }}>
+          <Calendar size={18} style={{ color: C.accentDark }} />
+          <h3 className="font-mono text-sm font-bold uppercase tracking-widest" style={{ color: C.primary, margin: 0 }}>Historial de Descargas</h3>
+        </div>
+        
+        {historial.length === 0 ? (
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 bg-[#E8F8F1] rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText size={24} style={{ color: C.accentDark }} />
+            </div>
+            <p className="font-mono text-sm font-bold" style={{ color: C.primary }}>Aún no has generado reportes</p>
+            <p className="font-sans text-sm mt-1" style={{ color: C.textSecondary }}>Tus descargas aparecerán aquí para referencia futura.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[rgba(8,28,17,0.03)]">
+            {historial.map((h) => (
+              <div key={h.id} className="flex items-center gap-5 px-8 py-4 transition-colors hover:bg-[#F0FBF6] group">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner" style={{ background: '#E8F8F1' }}>
+                  <FileText size={18} style={{ color: C.accentDark }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-sans text-sm font-bold truncate" style={{ color: C.primary }}>
+                    {h.titulo}
+                  </div>
+                  <div className="font-mono text-[11px] font-medium mt-1" style={{ color: C.textSecondary }}>
+                    {h.parametros?.total_registros != null ? <span className="font-bold text-emerald-700">{h.parametros.total_registros} registros analizados</span> : ''} 
+                    {h.parametros?.total_registros != null && ' • '}
+                    {formatFecha(h.fecha_generado)}
+                  </div>
+                </div>
+                <span className="font-mono text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold shadow-sm" style={{ background: C.primary, color: C.white }}>
+                  {h.formato?.toUpperCase() || 'PDF'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

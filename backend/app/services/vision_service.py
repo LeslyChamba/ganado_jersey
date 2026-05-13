@@ -13,9 +13,11 @@ from app.schemas.schemas import MorfometriaData
 
 logger = logging.getLogger(__name__)
 
-PROYECTO_DIR = Path(r"C:\Users\HP\Documents\tesis_ganado_jersey\Jersey-Prediccion")
-SAM_MODEL    = PROYECTO_DIR / "models_pt" / "sam_vit_b.pth"
-BCS_MODEL    = Path(r"C:\Users\HP\Documents\Proyecto_Peso_BCS_Vacas\02_Models\BCS\best.pt")
+# ── Rutas relativas al archivo — funcionan en cualquier máquina / Docker ──
+PROYECTO_DIR = Path(__file__).resolve().parent.parent.parent  # /backend
+MODELS_DIR   = PROYECTO_DIR / "models_pt"
+SAM_MODEL    = MODELS_DIR / "sam_vit_b.pth"
+BCS_MODEL    = MODELS_DIR / "best.pt"
 
 
 # ── SAM ──────────────────────────────────────────────────────────────────────

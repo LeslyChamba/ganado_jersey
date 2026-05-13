@@ -1,4 +1,4 @@
-# 🐄 JER-WEIGHT — Backend
+#  JER-WEIGHT — Backend
 
 Sistema de Estimación de Peso en Vacas Jersey mediante Visión por Computadora.
 

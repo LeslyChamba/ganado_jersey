@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from typing import List
 
@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Seguridad
-    SECRET_KEY: str = "dev_secret_key_cambia_esto"
+    SECRET_KEY: str = "e15976ade912b6a127ec57cf44f475a9becdd2d0d7a2d2b4f6c844f7c4502a16"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -31,8 +31,14 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = ""
 
     # Modelos ML
-    MASS_MODEL_PATH: str = "models_pt/mass_model.pt"
-    BCS_MODEL_PATH: str = "models_pt/bcs_model.pt"
+    MASS_MODEL_PATH: str = "C:/Users/HP/Documents/tesis_ganado_jersey/Jersey-Prediccion/models_pt/02_Models/Peso/best.pt"
+    BCS_MODEL_PATH: str = "C:/Users/HP/Documents/tesis_ganado_jersey/Jersey-Prediccion/models_pt/02_Models/BCS/best.pt"
+    SAM_CHECKPOINT_PATH: str = "models_pt/sam_checkpoint.pth"
+    YOLO_BCS_PATH: str = "models_pt/yolov8_bcs.pt"
+
+    # Hugging Face
+    HF_TOKEN: str = ""       
+    HF_REPO_ID: str = ""     
 
     # Inferencia
     DEVICE: str = "cpu"
@@ -51,6 +57,14 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
+    ENCRYPTION_KEY: str  # ← agregar esta línea
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
     @property
     def DATABASE_URL(self) -> str:
         # Usa DB_* como fuente principal
@@ -68,11 +82,6 @@ class Settings(BaseSettings):
     @property
     def MAX_IMAGE_SIZE_BYTES(self) -> int:
         return self.IMAGE_MAX_SIZE_MB * 1024 * 1024
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # Ignora variables extra en el .env
 
 
 @lru_cache()

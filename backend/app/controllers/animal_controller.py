@@ -3,7 +3,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-
+from app.core.exceptions import registrar_error_auditoria  
+from fastapi import Request
 from app.db.database import get_db
 from app.models.models import Animal, Hato, Medicion, Usuario
 from app.schemas.schemas import (
@@ -158,31 +159,64 @@ animal_router = APIRouter(prefix="/animales", tags=["Animales"])
 @animal_router.post("/", response_model=AnimalResponse, status_code=status.HTTP_201_CREATED)
 def crear_animal(
     datos: AnimalCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
-    hato = db.query(Hato).filter(
-        Hato.id == datos.hato_id,
-        Hato.propietario_id == current_user.id
-    ).first()
-    if not hato:
-        raise HTTPException(status_code=404, detail="Hato no encontrado")
+    try:
+        hato = db.query(Hato).filter(
+            Hato.id == datos.hato_id,
+            Hato.propietario_id == current_user.id
+        ).first()
+        if not hato:
+            raise HTTPException(status_code=404, detail="Hato no encontrado")
 
-    existente = db.query(Animal).filter(
-        Animal.hato_id == datos.hato_id,
-        Animal.arete == datos.arete
-    ).first()
-    if existente:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Ya existe un animal con arete '{datos.arete}' en este hato"
+        existente = db.query(Animal).filter(
+            Animal.hato_id == datos.hato_id,
+            Animal.arete == datos.arete
+        ).first()
+        if existente:
+            raise ValueError(f"Intento de duplicar arete: {datos.arete}")
+
+        animal = Animal(**datos.model_dump())
+        db.add(animal)
+        db.commit()
+        db.refresh(animal)
+
+        datos_para_log = datos.model_dump(mode="json")
+
+        # LOG DE ÉXITO 
+        registrar_log(
+            db=db,
+            accion=AccionAuditoria.CREAR,
+            usuario_id=current_user.id,
+            usuario_email=current_user.email,
+            tabla="animales",
+            registro_id=str(animal.id),
+            despues=datos.model_dump(),
+            ip=request.client.host
         )
+        
+        return _enriquecer_animal(animal, db)
 
-    animal = Animal(**datos.model_dump())
-    db.add(animal)
-    db.commit()
-    db.refresh(animal)
-    return _enriquecer_animal(animal, db)
+    except Exception as e:
+        db.rollback()
+        
+        # 4. LOG DE ERROR 
+        # Esto demuestra el fallo aunque la vaca no se cree
+        id_recurso_str = str(datos.arete) if datos.arete else "Desconocido" 
+        registrar_error_auditoria(
+            db=db,
+            usuario_email=current_user.email,
+            modulo="Animales",
+            accion="Crear Animal",
+            error=e,
+            id_recurso=id_recurso_str # Guardamos el ARETE que dio problemas
+        )
+        
+        # Si era una validación nuestra, mandamos 400, si no 500
+        detail = str(e) if isinstance(e, ValueError) else "Error interno del servidor"
+        raise HTTPException(status_code=400, detail=detail)
 
 
 @animal_router.get("/", response_model=list[AnimalResponse])

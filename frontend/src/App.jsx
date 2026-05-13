@@ -3,13 +3,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 
 import Layout        from './components/layout/Layout'
+import AdminPage     from "./pages/AdminPage"
+import AuditoriaPage from "./pages/AuditoriaPage"
 import LoginPage     from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import HatosPage     from './pages/HatosPage'
 import VacasPage     from './pages/VacasPage'
 import AnalisisPage  from './pages/AnalisisPage'
 import ReportesPage  from './pages/ReportesPage'
-
+import Guiacaptura from './pages/Guiacaptura';
+import RecuperarPassword from './components/RecuperarPassword';
+import BovinosPage from './components/admin/bovinosPage'
+import RestablecerPassword from './components/RestablecerPassword';
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 1000 * 30 } }
 })
@@ -28,6 +33,8 @@ export default function App() {
         }}/>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/recuperarpassword" element={<RecuperarPassword />} />  
+          <Route path="/reset-password" element={<RestablecerPassword />} />
           <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route index          element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
@@ -35,6 +42,10 @@ export default function App() {
             <Route path="vacas"     element={<VacasPage />} />
             <Route path="analisis"  element={<AnalisisPage />} />
             <Route path="reportes"  element={<ReportesPage />} />
+            <Route path="admin/usuarios"     element={<AdminPage />} />
+            <Route path="admin/auditoria"    element={<AuditoriaPage />} />
+            <Route path="admin/bovinos"      element={<BovinosPage />} />
+            <Route path="guiacaptura"        element={<Guiacaptura />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

@@ -2,13 +2,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import (
-    String, Float, Boolean, DateTime, ForeignKey,
+    Column, String, Float, Boolean, DateTime, ForeignKey,
     Enum as SQLEnum, Text, Integer, JSON
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
-
+from sqlalchemy import event
+from app.core.encryption import encrypt, decrypt
 from app.db.database import Base
 
 
@@ -17,21 +18,20 @@ from app.db.database import Base
 class RolUsuario(str, enum.Enum):
     ADMIN = "admin"
     GANADERO = "ganadero"
-    VETERINARIO = "veterinario"
-
+    
 class PropositoAnimal(str, enum.Enum):
     CARNE = "carne"
     LECHE = "leche"
     DOBLE_PROPOSITO = "doble_proposito"
 
 class TipoReporte(str, enum.Enum):
-    INDIVIDUAL = "individual"
-    HATO       = "hato"
-    GENERAL    = "general"
+    INDIVIDUAL = "INDIVIDUAL"
+    HATO       = "HATO"
+    GENERAL    = "GENERAL"
 
 class FormatoReporte(str, enum.Enum):
-    PDF   = "pdf"
-    EXCEL = "excel"
+    PDF   = "PDF"
+    EXCEL = "EXCEL"
 
 class AccionAuditoria(str, enum.Enum):
     LOGIN           = "login"
@@ -51,9 +51,9 @@ class Usuario(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(500), unique=True, nullable=False, index=False)
+    nombre: Mapped[str] = mapped_column(String(500), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     apellido: Mapped[str] = mapped_column(String(100), nullable=False)
     telefono: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     rol: Mapped[RolUsuario] = mapped_column(
@@ -61,6 +61,10 @@ class Usuario(Base):
         default=RolUsuario.GANADERO, nullable=False
     )
     activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    intentos_fallidos: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bloqueado_hasta: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ultimo_acceso: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reset_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -71,11 +75,27 @@ class Usuario(Base):
     )
 
     hatos: Mapped[List["Hato"]] = relationship("Hato", back_populates="propietario")
+    @property
+    def email_legible(self) -> str:
+        return decrypt(self.email)
 
+    @property
+    def nombre_legible(self) -> str:
+        return decrypt(self.nombre)
     def __repr__(self):
         return f"<Usuario {self.email} ({self.rol})>"
 
+def _ya_encriptado(valor: str) -> bool:
+    return valor is not None and valor.startswith("gAAAA")
 
+@event.listens_for(Usuario, "before_insert")
+@event.listens_for(Usuario, "before_update")
+def encriptar_pii_usuario(mapper, connection, target: Usuario):
+    if target.email and not _ya_encriptado(target.email):
+        target.email = encrypt(target.email)
+    if target.nombre and not _ya_encriptado(target.nombre):
+        target.nombre = encrypt(target.nombre)
+   
 # ─── Schema: ganaderia ──────────────────────────────────────────────────────
 
 class Hato(Base):
@@ -161,7 +181,13 @@ class Medicion(Base):
     fecha_medicion: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
     )
-    notas: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notas: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+
+    @property
+    def notas_legibles(self) -> Optional[str]:
+        if not self.notas:
+            return None
+        return decrypt(self.notas)
 
     animal_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("ganaderia.animales.id"), nullable=False, index=True
@@ -171,7 +197,12 @@ class Medicion(Base):
 
     def __repr__(self):
         return f"<Medicion {self.animal_id} | {self.peso_estimado_kg}kg BCS:{self.bcs}>"
-
+# ── Encriptar notas de medición antes de INSERT y UPDATE ────────────────────
+@event.listens_for(Medicion, "before_insert")
+@event.listens_for(Medicion, "before_update")
+def encriptar_notas_medicion(mapper, connection, target: Medicion):
+    if target.notas and not _ya_encriptado(target.notas):
+        target.notas = encrypt(target.notas)
 
 # ─── Schema: reportes ───────────────────────────────────────────────────────
 

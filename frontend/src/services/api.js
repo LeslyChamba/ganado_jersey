@@ -5,11 +5,31 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// HU-14: Rastreo de inactividad — actualizar timestamp en cada petición
+let _lastActivity = Date.now()
+const INACTIVIDAD_MS = 30 * 60 * 1000  // 30 minutos
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+
+  // Detectar sesión expirada por inactividad ANTES de enviar la petición
+  if (token && Date.now() - _lastActivity > INACTIVIDAD_MS) {
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('usuario')
+    window.location.href = '/login?expired=1'
+    return Promise.reject(new Error('Sesión expirada por inactividad'))
+  }
+  _lastActivity = Date.now()
   return config
 })
+
+// Actualizar lastActivity también en eventos de usuario
+if (typeof window !== 'undefined') {
+  ;['click', 'keydown', 'touchstart', 'scroll'].forEach(ev =>
+    window.addEventListener(ev, () => { _lastActivity = Date.now() }, { passive: true })
+  )
+}
 
 api.interceptors.response.use(
   (res) => res,
@@ -52,6 +72,9 @@ export const animalesApi = {
 
 // ─── ANÁLISIS ─────────────────────────────────────────────────────────────
 export const analisisApi = {
+  validar: (formData) => api.post('/analisis/validar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   analizar:       (formData) => api.post('/analisis/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
@@ -60,10 +83,24 @@ export const analisisApi = {
 
 // ─── REPORTES ─────────────────────────────────────────────────────────────
 export const reportesApi = {
-  listar:   ()           => api.get('/reportes/'),
-  crear:    (datos)      => api.post('/reportes/', datos),
-  obtener:  (id)         => api.get(`/reportes/${id}`),
-  eliminar: (id)         => api.delete(`/reportes/${id}`),
+  listar:    ()      => api.get('/reportes/'),
+  crear:     (datos) => api.post('/reportes/', datos),
+  obtener:   (id)    => api.get(`/reportes/${id}`),
+  eliminar:  (id)    => api.delete(`/reportes/${id}`),
+  historial: ()      => api.get('/reportes/historial'),
+  // RF-15: descarga PDF real con filtros
+  exportarPdf: (params) => api.get('/reportes/exportar/pdf', {
+    params,
+    responseType: 'blob',
+  }),
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────
+export const dashboardApi = {
+  ganadero: ()       => api.get('/dashboard/ganadero'),
+  admin:    ()       => api.get('/dashboard/admin'),
+  alertas:  ()       => api.get('/dashboard/alertas'),
+  auditoria: (params) => api.get('/dashboard/auditoria', { params }),
 }
 
 export default api

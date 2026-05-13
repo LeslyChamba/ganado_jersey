@@ -1,156 +1,521 @@
-import { useState, useRef, useEffect } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { animalesApi, hatosApi, analisisApi } from '../services/api'
 import { getBCSColor, getBCSLabel } from '../services/helpers'
 import toast from 'react-hot-toast'
 import {
-  Upload, Scale, CheckCircle2, RotateCcw,
-  AlertTriangle, Search, UserPlus, Check, ChevronDown
+  Scale, CheckCircle2, RotateCcw, Search, UserPlus, Check,
+  ChevronDown, Info, Camera, BookOpen, AlertTriangle,
+  ShieldAlert, ShieldCheck, Loader2, XCircle, RefreshCw,
+  Ruler, TrendingDown, TrendingUp, Minus
 } from 'lucide-react'
+import GuiaCaptura from './GuiaCaptura'
+
+// ─── Tokens de Color ──────────────────────────────────────────────────────
+const C = {
+  bg: '#F0FBF6', card: '#FFFFFF', cardBorder: '#E0F4EC',
+  primary: '#081C11', primaryVar: '#1B4332',
+  accent: '#52D9A0', accentDark: '#1B6B3A',
+  text: '#081C11', textSub: '#2A5C3A', textSecondary: '#4A8C5C',
+  textLight: '#C0E8D4', border: '#E0F4EC', white: '#FFFFFF',
+  success: '#1B4332', successText: '#52D9A0', successBg: 'rgba(82,217,160,0.1)',
+  warning: '#F5C542', warningBg: '#FFFBEB', warningBorder: '#FDE68A',
+  error: '#C0392B', errorBg: '#FEF2F2',
+}
+
+// ─── Umbrales de confianza ────────────────────────────────────────────────
+const BCS_CONFIDENCE_THRESHOLD  = 70
+const PESO_CONFIDENCE_THRESHOLD = 65
 
 const STEPS = [
-  'Cargando imágenes',
-  'Segmentando silueta (SAM)',
-  'Extrayendo keypoints',
-  'Calculando morfometría',
-  'Estimando masa (XGBoost)',
-  'Calculando BCS (YOLOv8)',
-  'Generando reporte',
+  'Cargando imágenes al servidor seguro',
+  'Segmentando silueta (SAM Neural Net)',
+  'Extrayendo keypoints anatómicos',
+  'Calculando morfometría computacional',
+  'Estimando masa corporal (XGBoost)',
+  'Determinando BCS (YOLOv8 Gen AI)',
+  'Finalizando reporte métrico',
 ]
 
-// ─── Silueta SVG lateral ──────────────────────────────────────────────────
-const SiluetaLateral = ({ ok }) => (
-  <svg viewBox="0 0 320 180" className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
-    <rect x="22" y="10" width="276" height="160" rx="6" fill="none"
-      stroke={ok ? '#5C8B6A' : '#89B99A'} strokeWidth="1.2" strokeDasharray="6,3" opacity="0.7"/>
-    <ellipse cx="148" cy="90" rx="95" ry="44"
-      fill={ok ? 'rgba(92,139,106,0.12)' : 'rgba(137,185,154,0.10)'}
-      stroke={ok ? '#5C8B6A' : '#89B99A'} strokeWidth="1.8"/>
-    <ellipse cx="222" cy="74" rx="30" ry="22"
-      fill={ok ? 'rgba(92,139,106,0.10)' : 'rgba(137,185,154,0.08)'}
-      stroke={ok ? '#5C8B6A' : '#89B99A'} strokeWidth="1.5"/>
-    <ellipse cx="256" cy="64" rx="22" ry="18"
-      fill={ok ? 'rgba(92,139,106,0.10)' : 'rgba(137,185,154,0.08)'}
-      stroke={ok ? '#5C8B6A' : '#89B99A'} strokeWidth="1.5"/>
-    {[75, 105, 165, 195].map((px, i) => (
-      <rect key={i} x={px - 7} y="130" width="14" height="38" rx="4"
-        fill={ok ? 'rgba(92,139,106,0.08)' : 'rgba(137,185,154,0.06)'}
-        stroke={ok ? '#5C8B6A' : '#89B99A'} strokeWidth="1.2"/>
-    ))}
-    <path d="M54 85 Q36 72 32 58" stroke={ok ? '#5C8B6A' : '#89B99A'} strokeWidth="1.5" fill="none"/>
-    <line x1="232" y1="128" x2="60" y2="128" stroke="#3D6B9E" strokeWidth="1.2"/>
-    <polygon points="232,128 225,124 225,132" fill="#3D6B9E"/>
-    <polygon points="60,128 67,124 67,132"   fill="#3D6B9E"/>
-    <text x="146" y="142" textAnchor="middle" fill="#3D6B9E" fontSize="7" fontFamily="monospace" fontWeight="700">LC</text>
-    <line x1="188" y1="54" x2="188" y2="130" stroke="#C0392B" strokeWidth="1.3"/>
-    <text x="192" y="88" fill="#C0392B" fontSize="7" fontFamily="monospace" fontWeight="700">PT</text>
-    <line x1="148" y1="50" x2="148" y2="168" stroke="#C8914A" strokeWidth="1" strokeDasharray="3,2"/>
-    <text x="152" y="100" fill="#C8914A" fontSize="7" fontFamily="monospace" fontWeight="700">AC</text>
-    <circle cx="232" cy="82" r="5" fill="#3D6B9E" opacity="0.9"/>
-    <circle cx="60"  cy="82" r="5" fill="#3D6B9E" opacity="0.9"/>
-    <text x="220" y="72" fill="#3D6B9E" fontSize="6" fontFamily="monospace">ENC</text>
-    <text x="42"  y="72" fill="#3D6B9E" fontSize="6" fontFamily="monospace">ISQ</text>
-    {ok ? (
-      <text x="160" y="18" textAnchor="middle" fill="#5C8B6A" fontSize="7" fontFamily="monospace" fontWeight="700">
-        ✓ ALINEADA — LISTO PARA ANALIZAR
-      </text>
-    ) : (
-      <text x="160" y="18" textAnchor="middle" fill="#89B99A" fontSize="7" fontFamily="monospace">
-        ALINEA LA VACA CON EL CONTORNO
-      </text>
-    )}
-  </svg>
-)
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ FIX 1: Normalizador de confianza
+// El backend puede devolver 0-1 (decimal) o 0-100 (porcentaje).
+// Esta función garantiza que SIEMPRE trabajemos en escala 0-100.
+// ─────────────────────────────────────────────────────────────────────────────
+function normalizarConfianza(valor) {
+  if (valor == null || isNaN(valor)) return 0
+  // Si el valor es <= 1.0 asumimos que es decimal (0-1) → convertir a %
+  // Si ya es > 1 asumimos que ya viene en porcentaje (0-100)
+  return valor <= 1.0 ? valor * 100 : valor
+}
 
-// ─── Foto lateral con overlay ─────────────────────────────────────────────
-function FotoLateral({ file, onChange, inputRef }) {
-  const preview = file ? URL.createObjectURL(file) : null
+// ─── Compresión de imagen ─────────────────────────────────────────────────
+async function comprimirImagen(file, maxWidthPx = 1280, calidadJpeg = 0.82) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const escala = Math.min(1, maxWidthPx / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(img.width  * escala)
+      canvas.height = Math.round(img.height * escala)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      canvas.toBlob(
+        (blob) => resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' })),
+        'image/jpeg', calidadJpeg
+      )
+    }
+    img.src = url
+  })
+}
+
+// ─── Validación básica local ──────────────────────────────────────────────
+async function validarCalidadLocal(file) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const ladoCorto = Math.min(img.width, img.height)
+      const ladoLargo = Math.max(img.width, img.height)
+      if (ladoCorto < 240 || ladoLargo < 400) {
+        URL.revokeObjectURL(url)
+        return resolve({ ok: false, motivo: `Resolución insuficiente (${img.width}×${img.height}px).` })
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = 80; canvas.height = 60
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, 80, 60)
+      const data = ctx.getImageData(0, 0, 80, 60).data
+      let suma = 0
+      for (let i = 0; i < data.length; i += 4)
+        suma += (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114)
+      const brillo = suma / (data.length / 4)
+      URL.revokeObjectURL(url)
+      if (brillo < 25)  return resolve({ ok: false, motivo: 'Imagen muy oscura.' })
+      if (brillo > 245) return resolve({ ok: false, motivo: 'Imagen sobreexpuesta.' })
+      resolve({ ok: true })
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: false, motivo: 'No se pudo leer la imagen.' }) }
+    img.src = url
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ FIX 2: Componente comparador de peso real
+// Permite al productor ingresar el peso real medido con báscula/cinta
+// y calcula el error absoluto, el error porcentual y la calificación.
+// ─────────────────────────────────────────────────────────────────────────────
+function ComparadorPesoReal({ pesoEstimado }) {
+  const [pesoReal, setPesoReal]         = useState('')
+  const [comparado, setComparado]       = useState(null)
+  const [inputFocused, setInputFocused] = useState(false)
+
+  const calcularDiferencia = () => {
+    const real = parseFloat(pesoReal)
+    if (!real || real <= 0 || real > 1200) {
+      return toast.error('Ingresa un peso real válido (1 – 1200 kg)')
+    }
+
+    const diferencia    = pesoEstimado - real          // positivo = sobreestimó
+    const errorAbsoluto = Math.abs(diferencia)
+    const errorPct      = (errorAbsoluto / real) * 100
+
+    // Calificación basada en umbrales ganadería de precisión
+    let nivel, color, icono
+    if (errorPct <= 3)       { nivel = 'Excelente';   color = C.accentDark;  icono = '🏆' }
+    else if (errorPct <= 7)  { nivel = 'Muy bueno';   color = '#2563EB';     icono = '✅' }
+    else if (errorPct <= 12) { nivel = 'Aceptable';   color = '#D97706';     icono = '⚠️' }
+    else if (errorPct <= 18) { nivel = 'Regular';     color = '#EA580C';     icono = '⚠️' }
+    else                     { nivel = 'Fuera de rango'; color = C.error;    icono = '❌' }
+
+    setComparado({ real, diferencia, errorAbsoluto, errorPct, nivel, color, icono })
+  }
+
+  const resetComparador = () => { setPesoReal(''); setComparado(null) }
+
   return (
-    <div>
-      <label className="label">📸 Foto lateral *</label>
-      <div onClick={() => inputRef.current?.click()}
-        className="relative rounded-xl cursor-pointer overflow-hidden"
-        style={{
-          height: '180px',
-          border: file ? '1.5px solid #89B99A' : '1.5px dashed #C8D8C0',
-          background: file ? 'transparent' : 'rgba(137,185,154,0.04)',
-        }}>
-        {preview && (
-          <img src={preview} alt="lateral" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.65 }} />
-        )}
-        <SiluetaLateral ok={!!file} />
-        {!preview && (
-          <div className="absolute inset-0 flex flex-col items-center justify-end pb-4 z-20">
-            <Upload size={18} style={{ color: '#C8D8C0' }} className="mb-1" />
-            <span className="font-mono text-xs" style={{ color: '#B0A090' }}>Toca para subir la foto</span>
+    <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-emerald-50">
+      {/* Encabezado */}
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{ background: '#E8F8F1' }}>
+          <Ruler size={20} style={{ color: C.accentDark }} />
+        </div>
+        <div>
+          <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.3rem', fontWeight: 800 }}>
+            Verificar con Peso Real
+          </h3>
+          <p className="font-mono text-[10px] mt-0.5 uppercase tracking-wider" style={{ color: C.textSecondary }}>
+            Compara la estimación IA con báscula o cinta bovinométrica
+          </p>
+        </div>
+      </div>
+
+      {!comparado ? (
+        /* ── Formulario de entrada ─────────────────────────────────────── */
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="number"
+                min="1" max="1200" step="0.5"
+                placeholder="Ej: 390.5"
+                value={pesoReal}
+                onChange={e => setPesoReal(e.target.value)}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                onKeyDown={e => e.key === 'Enter' && calcularDiferencia()}
+                className="w-full px-4 py-3.5 rounded-xl border font-mono text-sm focus:outline-none transition-all"
+                style={{
+                  borderColor: inputFocused ? C.accentDark : 'rgba(27,67,50,0.15)',
+                  background: '#F9FDFB',
+                  color: C.primary,
+                  boxShadow: inputFocused ? `0 0 0 3px rgba(82,217,160,0.15)` : 'none',
+                }}
+              />
+              {/* Unidad */}
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-bold"
+                style={{ color: C.textSub }}>kg</span>
+            </div>
+            <button
+              type="button"
+              onClick={calcularDiferencia}
+              disabled={!pesoReal}
+              className="px-6 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: C.primary, color: '#FFFFFF' }}>
+              Calcular
+            </button>
           </div>
-        )}
-        {preview && (
-          <div className="absolute bottom-2 right-2 z-20">
-            <span className="font-mono text-xs px-2 py-1 rounded-lg"
-              style={{ background: 'rgba(255,255,255,0.92)', color: '#5C8B6A', border: '0.5px solid #D0C5B0' }}>
-              cambiar
+
+          {/* Hint informativo */}
+          <div className="flex items-start gap-2 p-3.5 rounded-xl"
+            style={{ background: '#F0FBF6', border: '1px solid rgba(82,217,160,0.2)' }}>
+            <Info size={13} style={{ color: C.accentDark, flexShrink: 0, marginTop: 1 }} />
+            <span className="font-sans text-xs leading-relaxed" style={{ color: C.textSub }}>
+              Ingresa el peso obtenido con báscula o cinta bovinométrica <strong>en la misma sesión</strong> para validar la precisión del modelo.
             </span>
           </div>
-        )}
-        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp"
-          className="hidden" onChange={e => onChange(e.target.files[0] || null)} />
-      </div>
-      <div className="flex gap-3 mt-1.5">
-        {[['#3D6B9E', 'LC largo corporal'], ['#C0392B', 'PT perímetro'], ['#C8914A', 'AC alzada']].map(([color, label]) => (
-          <div key={label} className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-            <span className="font-mono" style={{ color: '#B0A090', fontSize: '10px' }}>{label}</span>
+        </div>
+
+      ) : (
+        /* ── Panel de resultados ───────────────────────────────────────── */
+        <div className="space-y-5 animate-in zoom-in-95 duration-300">
+
+          {/* Fila principal: estimado vs real */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-2xl p-5 text-center"
+              style={{ background: C.primary }}>
+              <div className="font-mono text-[9px] uppercase tracking-widest mb-1"
+                style={{ color: C.accent }}>IA Estimó</div>
+              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '2.8rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
+                {pesoEstimado.toFixed(0)}
+                <span className="font-mono text-lg" style={{ color: C.accent }}> kg</span>
+              </div>
+            </div>
+            <div className="rounded-2xl p-5 text-center"
+              style={{ background: '#F9FDFB', border: '1.5px solid rgba(27,67,50,0.1)' }}>
+              <div className="font-mono text-[9px] uppercase tracking-widest mb-1"
+                style={{ color: C.textSub }}>Peso Real</div>
+              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '2.8rem', fontWeight: 900, color: C.primary, lineHeight: 1 }}>
+                {comparado.real.toFixed(0)}
+                <span className="font-mono text-lg" style={{ color: C.textSub }}> kg</span>
+              </div>
+            </div>
           </div>
-        ))}
+
+          {/* Métricas de error */}
+          <div className="rounded-2xl p-6"
+            style={{ background: `${comparado.color}12`, border: `2px solid ${comparado.color}30` }}>
+
+            {/* Nivel de precisión */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-widest mb-0.5"
+                  style={{ color: C.textSub }}>Precisión del modelo</div>
+                <div className="font-mono text-lg font-bold" style={{ color: comparado.color }}>
+                  {comparado.icono} {comparado.nivel}
+                </div>
+              </div>
+              {/* Ícono de tendencia */}
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                style={{ background: `${comparado.color}20` }}>
+                {comparado.diferencia > 0
+                  ? <TrendingUp  size={22} style={{ color: comparado.color }} />
+                  : comparado.diferencia < 0
+                  ? <TrendingDown size={22} style={{ color: comparado.color }} />
+                  : <Minus size={22} style={{ color: comparado.color }} />
+                }
+              </div>
+            </div>
+
+            {/* Métricas en grilla */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* Error absoluto */}
+              <div className="rounded-xl p-3.5 text-center"
+                style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div className="font-mono text-[8px] uppercase tracking-wider mb-1"
+                  style={{ color: C.textSub }}>Error abs.</div>
+                <div className="font-mono text-xl font-bold" style={{ color: comparado.color }}>
+                  {comparado.errorAbsoluto.toFixed(1)}
+                </div>
+                <div className="font-mono text-[9px]" style={{ color: C.textSub }}>kg</div>
+              </div>
+
+              {/* Error porcentual (MAPE) */}
+              <div className="rounded-xl p-3.5 text-center"
+                style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div className="font-mono text-[8px] uppercase tracking-wider mb-1"
+                  style={{ color: C.textSub }}>Error %</div>
+                <div className="font-mono text-xl font-bold" style={{ color: comparado.color }}>
+                  {comparado.errorPct.toFixed(1)}
+                </div>
+                <div className="font-mono text-[9px]" style={{ color: C.textSub }}>MAPE</div>
+              </div>
+
+              {/* Dirección del error */}
+              <div className="rounded-xl p-3.5 text-center"
+                style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div className="font-mono text-[8px] uppercase tracking-wider mb-1"
+                  style={{ color: C.textSub }}>Diferencia</div>
+                <div className="font-mono text-xl font-bold"
+                  style={{ color: comparado.diferencia > 0 ? '#2563EB' : comparado.diferencia < 0 ? C.error : C.accentDark }}>
+                  {comparado.diferencia > 0 ? '+' : ''}{comparado.diferencia.toFixed(1)}
+                </div>
+                <div className="font-mono text-[9px]" style={{ color: C.textSub }}>
+                  {comparado.diferencia > 0 ? 'sobrestimó' : comparado.diferencia < 0 ? 'subestimó' : 'exacto'}
+                </div>
+              </div>
+            </div>
+
+            {/* Barra de error visual */}
+            <div className="mt-4">
+              <div className="flex justify-between font-mono text-[9px] mb-1.5"
+                style={{ color: C.textSub }}>
+                <span>0%</span>
+                <span>Error: {comparado.errorPct.toFixed(1)}%</span>
+                <span>20%+</span>
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden relative"
+                style={{ background: 'rgba(0,0,0,0.08)' }}>
+                {/* Zona verde ≤ 5% */}
+                <div className="absolute inset-y-0 left-0 rounded-l-full"
+                  style={{ width: '25%', background: 'rgba(82,217,160,0.3)' }} />
+                {/* Barra del error actual */}
+                <div className="h-full rounded-full transition-all duration-1000"
+                  style={{ width: `${Math.min(comparado.errorPct * 5, 100)}%`, background: comparado.color }} />
+                {/* Marcador umbral 5% */}
+                <div className="absolute inset-y-0 w-0.5"
+                  style={{ left: '25%', background: 'rgba(0,0,0,0.25)' }} />
+              </div>
+              <div className="font-mono text-[8px] mt-1" style={{ color: C.textSub }}>
+                ← Zona ideal (≤ 5%) | Literarura científica Jersey: MAE ≈ 4–15 kg
+              </div>
+            </div>
+          </div>
+
+          {/* Botón de reiniciar comparador */}
+          <button type="button" onClick={resetComparador}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest border transition-all hover:bg-gray-50 active:scale-95"
+            style={{ color: C.textSub, borderColor: 'rgba(27,67,50,0.15)' }}>
+            <RotateCcw size={12} /> Ingresar otro peso real
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Componente: tarjeta de resultado de validación por foto ──────────────
+function ValidacionFotoCard({ titulo, resultado, onRetomar }) {
+  if (!resultado) return null
+  const { es_valida, animal_detectado, confianza_deteccion,
+          area_cobertura, posicion_correcta, motivo, sugerencia } = resultado
+  const confianzaNorm = normalizarConfianza(confianza_deteccion)
+  const color  = es_valida ? C.accentDark : C.error
+  const bg     = es_valida ? '#E8F8F1'    : C.errorBg
+  const border = es_valida ? 'rgba(82,217,160,0.4)' : '#FECACA'
+  const Icon   = es_valida ? ShieldCheck  : ShieldAlert
+  return (
+    <div className="rounded-2xl p-5 transition-all animate-in slide-in-from-top-2"
+      style={{ background: bg, border: `1.5px solid ${border}` }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Icon size={16} style={{ color }} />
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color }}>
+            {titulo}
+          </span>
+        </div>
+        {!es_valida && (
+          <button onClick={onRetomar}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[9px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95"
+            style={{ background: C.primary, color: '#FFFFFF' }}>
+            <RefreshCw size={10} /> Retomar
+          </button>
+        )}
+      </div>
+      <p className="font-sans text-[13px] font-medium mb-3 leading-relaxed" style={{ color: C.primary }}>
+        {motivo}
+      </p>
+      {!es_valida && sugerencia && (
+        <div className="flex items-start gap-2 p-3 rounded-xl mb-3"
+          style={{ background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.08)' }}>
+          <Info size={13} style={{ color: C.primary, flexShrink: 0, marginTop: 1 }} />
+          <span className="font-sans text-xs leading-relaxed" style={{ color: C.primary }}>{sugerencia}</span>
+        </div>
+      )}
+      {animal_detectado && (
+        <div className="flex gap-3 mt-2">
+          <div className="flex-1 rounded-lg p-2.5 text-center"
+            style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)' }}>
+            <div className="font-mono text-[8px] uppercase tracking-wider mb-0.5" style={{ color: C.textSub }}>Confianza</div>
+            <div className="font-mono text-sm font-bold" style={{ color }}>
+              {confianzaNorm.toFixed(0)}%  {/* ← normalizado */}
+            </div>
+          </div>
+          <div className="flex-1 rounded-lg p-2.5 text-center"
+            style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)' }}>
+            <div className="font-mono text-[8px] uppercase tracking-wider mb-0.5" style={{ color: C.textSub }}>Cobertura</div>
+            <div className="font-mono text-sm font-bold" style={{ color }}>
+              {(area_cobertura * 100).toFixed(0)}%
+            </div>
+          </div>
+          <div className="flex-1 rounded-lg p-2.5 text-center"
+            style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)' }}>
+            <div className="font-mono text-[8px] uppercase tracking-wider mb-0.5" style={{ color: C.textSub }}>Postura</div>
+            <div className="font-mono text-sm font-bold" style={{ color }}>
+              {posicion_correcta ? '✓ OK' : '✗ Error'}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Badge de confianza ───────────────────────────────────────────────────
+function ConfianzaBadge({ valor, umbral, label }) {
+  const baja  = valor < umbral
+  const media = !baja && valor < umbral + 15
+  const color = baja ? C.error : media ? '#D97706' : C.accentDark
+  const bg    = baja ? C.errorBg : media ? C.warningBg : '#E8F8F1'
+  const bord  = baja ? '#FECACA' : media ? C.warningBorder : 'rgba(82,217,160,0.3)'
+  const Icon  = baja ? ShieldAlert : media ? AlertTriangle : Check
+  return (
+    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider"
+      style={{ background: bg, color, border: `1px solid ${bord}` }}>
+      <Icon size={12} strokeWidth={baja ? 2 : 3} />
+      {label}: {valor.toFixed(1)}%
+    </div>
+  )
+}
+
+// ─── Silueta SVG lateral ──────────────────────────────────────────────────
+const SiluetaLateral = ({ ok }) => {
+  const cs = ok ? C.accent : C.textSub
+  const cf = ok ? 'url(#gradA)' : 'url(#gradI)'
+  return (
+    <svg viewBox="0 0 320 190" className="absolute inset-0 w-full h-full pointer-events-none transition-colors duration-500" style={{ zIndex: 10 }}>
+      <defs>
+        <linearGradient id="gradA" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#52D9A0" stopOpacity="0.2"/><stop offset="100%" stopColor="#1B4332" stopOpacity="0.05"/>
+        </linearGradient>
+        <linearGradient id="gradI" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#2A5C3A" stopOpacity="0.1"/><stop offset="100%" stopColor="#2A5C3A" stopOpacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <rect x="15" y="15" width="290" height="160" rx="12" fill="none" stroke={cs} strokeWidth="2" strokeDasharray="8,5" opacity={ok ? 0.9 : 0.4}/>
+      <path d="M60 70 C 70 50, 110 45, 150 45 S 230 55, 240 80 C 250 110, 245 140, 210 150 S 100 155, 70 140 S 50 100, 60 70 Z" fill={cf} stroke={cs} strokeWidth={ok ? "3" : "2"}/>
+      <path d="M235 60 C 245 40, 275 35, 290 50 S 295 80, 280 90 S 245 85, 235 60 Z" fill={cf} stroke={cs} strokeWidth="2"/>
+      <ellipse cx="285" cy="55" rx="3" ry="5" fill={cs} opacity={0.6}/>
+      <path d="M110 148 C 120 165, 170 165, 180 148" fill="none" stroke={cs} strokeWidth="1.8" opacity={0.7}/>
+      <rect x="200" y="135" width="12" height="40" rx="3" fill={cf} stroke={cs} strokeWidth="1.8"/>
+      <rect x="218" y="132" width="12" height="40" rx="3" fill={cf} stroke={cs} strokeWidth="1.8"/>
+      <rect x="75" y="132" width="13" height="42" rx="3" fill={cf} stroke={cs} strokeWidth="1.8"/>
+      <rect x="95" y="135" width="13" height="42" rx="3" fill={cf} stroke={cs} strokeWidth="1.8"/>
+      <g opacity={ok ? 1 : 0.25}>
+        <line x1="235" y1="130" x2="65" y2="130" stroke="#3D6B9E" strokeWidth="2"/>
+        <circle cx="235" cy="130" r="3" fill="#3D6B9E"/><circle cx="65" cy="130" r="3" fill="#3D6B9E"/>
+        <text x="150" y="142" textAnchor="middle" fill="#3D6B9E" fontSize="9" fontWeight="800">LC</text>
+        <line x1="190" y1="48" x2="190" y2="148" stroke={C.error} strokeWidth="2" strokeDasharray="4,2"/>
+        <text x="196" y="95" fill={C.error} fontSize="9" fontWeight="800">PT</text>
+      </g>
+      <rect x="70" y="14" width="180" height="16" rx="5" fill={ok ? C.primary : 'rgba(255,255,255,0.85)'}/>
+      <text x="160" y="25" textAnchor="middle" fill={ok ? C.accent : C.textSub} fontSize="9" fontFamily="JetBrains Mono, monospace" fontWeight="700" letterSpacing="0.06em">
+        {ok ? '✓ ALINEACIÓN CORRECTA' : 'AJUSTE LA VACA AL CONTORNO'}
+      </text>
+    </svg>
+  )
+}
+
+// ─── Foto Lateral ─────────────────────────────────────────────────────────
+function FotoLateral({ file, onChange, inputRef }) {
+  const [preview, setPreview] = useState(null)
+  useEffect(() => {
+    if (!file) { setPreview(null); return }
+    const url = URL.createObjectURL(file); setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+  return (
+    <div>
+      <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSub }}>📸 Foto lateral (Perfil) *</label>
+      <div onClick={() => inputRef.current?.click()} className="relative rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 group shadow-sm"
+        style={{ height: '220px', border: `2px dashed ${file ? C.accent : 'rgba(82,217,160,0.3)'}`, background: file ? '#1a2e20' : '#F9FDFB' }}>
+        {preview && <img src={preview} alt="lateral" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.85 }} />}
+        <SiluetaLateral ok={!!file} />
+        {!preview && (
+          <div className="absolute inset-0 flex flex-col items-center justify-end pb-8 z-20">
+            <Camera size={26} style={{ color: C.accentDark }} className="mb-2 opacity-70" />
+            <span className="font-mono text-[10px] px-4 py-1.5 rounded-md shadow-sm border"
+              style={{ background: C.card, color: C.primary, borderColor: 'rgba(82,217,160,0.2)', fontWeight: 700 }}>TAP PARA ABRIR CÁMARA</span>
+          </div>
+        )}
+        {preview && (
+          <div className="absolute bottom-3 right-3 z-20">
+            <span className="font-mono text-[10px] px-3 py-1.5 rounded-md backdrop-blur-md"
+              style={{ background: 'rgba(255,255,255,0.9)', color: C.primary, border: `1px solid ${C.cardBorder}`, fontWeight: 700 }}>Cambiar Foto</span>
+          </div>
+        )}
+        <input ref={inputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => onChange(e.target.files[0] || null)} />
       </div>
     </div>
   )
 }
 
-// ─── Foto trasera simple ──────────────────────────────────────────────────
+// ─── Foto Trasera ─────────────────────────────────────────────────────────
 function FotoUpload({ label, hint, file, onChange, inputRef }) {
-  const preview = file ? URL.createObjectURL(file) : null
+  const [preview, setPreview] = useState(null)
+  useEffect(() => {
+    if (!file) { setPreview(null); return }
+    const url = URL.createObjectURL(file); setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
   return (
     <div>
-      <label className="label">{label}</label>
-      <div onClick={() => inputRef.current?.click()}
-        className="relative rounded-xl cursor-pointer transition-all overflow-hidden flex flex-col items-center justify-center text-center"
-        style={{
-          height: '180px',
-          border: file ? '1.5px solid #89B99A' : '1.5px dashed #C8D8C0',
-          background: file ? 'transparent' : 'rgba(137,185,154,0.03)',
-        }}
-        onMouseOver={e => { if (!file) e.currentTarget.style.borderColor = '#89B99A' }}
-        onMouseOut={e  => { if (!file) e.currentTarget.style.borderColor = '#C8D8C0' }}>
+      <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSub }}>{label}</label>
+      <div onClick={() => inputRef.current?.click()} className="relative rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden flex flex-col items-center justify-center text-center group shadow-sm"
+        style={{ height: '220px', border: `2px dashed ${file ? C.accent : 'rgba(82,217,160,0.3)'}`, background: file ? 'transparent' : '#F9FDFB' }}>
         {preview ? (
           <>
-            <img src={preview} alt="" className="w-full h-full object-cover" />
-            <div className="absolute bottom-2 right-2">
-              <span className="font-mono text-xs px-2 py-1 rounded-lg"
-                style={{ background: 'rgba(255,255,255,0.92)', color: '#5C8B6A', border: '0.5px solid #D0C5B0' }}>
-                cambiar
-              </span>
+            <img src={preview} alt="trasera" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.9 }} />
+            <div className="absolute bottom-3 right-3 z-20">
+              <span className="font-mono text-[10px] px-3 py-1.5 rounded-md backdrop-blur-md"
+                style={{ background: 'rgba(255,255,255,0.9)', color: C.primary, border: `1px solid ${C.cardBorder}`, fontWeight: 700 }}>Cambiar Foto</span>
             </div>
           </>
         ) : (
-          <>
-            <Upload size={20} style={{ color: '#C8D8C0' }} className="mb-2" />
-            <span className="font-mono text-xs px-3" style={{ color: '#B0A090' }}>{hint}</span>
-          </>
+          <div className="p-5">
+            <Camera size={26} style={{ color: C.accentDark }} className="mb-2 mx-auto opacity-70" />
+            <span className="font-mono text-[10px] block mb-1 uppercase tracking-wider" style={{ color: C.primary, fontWeight: 700 }}>{hint}</span>
+            <span className="font-mono text-[9px] uppercase tracking-wider" style={{ color: C.textSub }}>Vista posterior · Grupa centrada</span>
+          </div>
         )}
-        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp"
-          className="hidden" onChange={e => onChange(e.target.files[0] || null)} />
-      </div>
-      <div className="flex items-center gap-1 mt-1.5">
-        <div className="w-2 h-2 rounded-full" style={{ background: '#8B5CF6' }} />
-        <span className="font-mono" style={{ color: '#B0A090', fontSize: '10px' }}>Ancho cadera · BCS</span>
+        <input ref={inputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => onChange(e.target.files[0] || null)} />
       </div>
     </div>
   )
 }
 
-// ─── Buscador de vaca por arete ───────────────────────────────────────────
+// ─── Buscador de vaca ─────────────────────────────────────────────────────
 function BuscadorVaca({ onVacaResuelta }) {
   const [arete, setArete]                   = useState('')
   const [buscando, setBuscando]             = useState(false)
@@ -159,11 +524,7 @@ function BuscadorVaca({ onVacaResuelta }) {
   const [hatoId, setHatoId]                 = useState('')
   const [hatos, setHatos]                   = useState([])
   const debounceRef = useRef()
-
-  useEffect(() => {
-    hatosApi.listar().then(r => setHatos(r.data)).catch(() => {})
-  }, [])
-
+  useEffect(() => { hatosApi.listar().then(r => setHatos(r.data)).catch(() => {}) }, [])
   useEffect(() => {
     if (!arete.trim()) { setVacaEncontrada(null); onVacaResuelta(null); return }
     clearTimeout(debounceRef.current)
@@ -171,96 +532,75 @@ function BuscadorVaca({ onVacaResuelta }) {
       setBuscando(true)
       try {
         const res = await animalesApi.buscarPorArete(arete.trim())
-        if (res.data) {
-          setVacaEncontrada(res.data)
-          onVacaResuelta(res.data)
-        } else {
-          setVacaEncontrada(false)
-          onVacaResuelta(null)
-        }
-      } catch {
-        setVacaEncontrada(false)
-        onVacaResuelta(null)
-      } finally {
-        setBuscando(false)
-      }
+        if (res.data) { setVacaEncontrada(res.data); onVacaResuelta(res.data) }
+        else { setVacaEncontrada(false); onVacaResuelta(null) }
+      } catch { setVacaEncontrada(false); onVacaResuelta(null) }
+      finally { setBuscando(false) }
     }, 600)
     return () => clearTimeout(debounceRef.current)
   }, [arete])
-
   const confirmarNueva = () => {
-    if (!hatoId) return toast.error('Selecciona el hato')
+    if (!hatoId) return toast.error('Selecciona el hato para la nueva vaca')
     onVacaResuelta({ _nuevo: true, arete: arete.trim(), nombre: nombre.trim() || null, hato_id: hatoId })
+    toast.success('Datos de vaca nueva listos')
   }
-
-  const esNueva     = vacaEncontrada === false
+  const esNueva = vacaEncontrada === false
   const esExistente = vacaEncontrada && vacaEncontrada !== false
-
+  const inputClass = "w-full px-4 py-3 rounded-xl border focus:outline-none transition-all font-mono text-sm"
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div>
-        <label className="label">Arete de la vaca *</label>
+        <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSub }}>Identificador Visual (Arete) *</label>
         <div className="relative">
-          <input
-            className="input pr-10"
-            placeholder="Ej: 0045, AR-123…"
-            value={arete}
-            onChange={e => { setArete(e.target.value); setVacaEncontrada(null); onVacaResuelta(null) }}
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            {buscando
-              ? <div className="w-4 h-4 border-2 rounded-full animate-spin"
-                     style={{ borderColor: '#89B99A', borderTopColor: 'transparent' }} />
-              : esExistente
-                ? <Check size={16} style={{ color: '#5C8B6A' }} />
-                : <Search size={14} style={{ color: '#C8BBA8' }} />
-            }
+          <input className={inputClass} style={{ borderColor: 'rgba(27,67,50,0.15)', background: '#F9FDFB', color: C.primary }}
+            placeholder="Ej: 0045, AR-123…" value={arete}
+            onChange={e => { setArete(e.target.value); setVacaEncontrada(null); onVacaResuelta(null) }} />
+          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+            {buscando ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: C.accentDark, borderTopColor: 'transparent' }} />
+              : esExistente ? <CheckCircle2 size={18} style={{ color: C.accentDark }} />
+              : esNueva ? <Info size={18} style={{ color: C.warning }} />
+              : <Search size={16} style={{ color: C.textSub }} />}
           </div>
         </div>
       </div>
-
       {esExistente && (
-        <div className="flex items-center gap-3 p-3 rounded-xl"
-          style={{ background: '#EAF4EE', border: '0.5px solid #89B99A' }}>
-          <CheckCircle2 size={16} style={{ color: '#5C8B6A' }} />
-          <div className="flex-1">
-            <div className="font-mono text-xs font-bold" style={{ color: '#2E4D38' }}>
-              Vaca encontrada · {vacaEncontrada.arete}
-            </div>
-            <div className="font-mono text-xs" style={{ color: '#8B7D6B' }}>
+        <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: '#E8F8F1', border: 'rgba(82,217,160,0.3) 1px solid' }}>
+          <Check size={20} style={{ color: C.accentDark }} strokeWidth={3} />
+          <div>
+            <div className="font-mono text-xs font-bold uppercase tracking-widest" style={{ color: C.primary }}>VACA REGISTRADA · {vacaEncontrada.arete}</div>
+            <div className="font-sans text-[13px] font-medium mt-0.5" style={{ color: C.textSub }}>
               {vacaEncontrada.nombre || 'Sin nombre'}
-              {vacaEncontrada.ultimo_peso_kg ? ` · Último peso: ${vacaEncontrada.ultimo_peso_kg} kg` : ''}
-              {vacaEncontrada.ultimo_bcs     ? ` · BCS: ${vacaEncontrada.ultimo_bcs}` : ''}
+              {vacaEncontrada.ultimo_peso_kg ? ` • ${vacaEncontrada.ultimo_peso_kg} kg` : ''}
+              {vacaEncontrada.ultimo_bcs ? ` • BCS ${vacaEncontrada.ultimo_bcs.toFixed(1)}` : ''}
             </div>
           </div>
         </div>
       )}
-
       {esNueva && (
-        <div className="space-y-3 p-3 rounded-xl"
-          style={{ background: '#F5F0E8', border: '0.5px solid #D0C5B0' }}>
-          <div className="flex items-center gap-2 font-mono text-xs" style={{ color: '#5C8B6A' }}>
-            <UserPlus size={13} /> Vaca nueva — completa los datos
+        <div className="space-y-4 p-5 rounded-2xl" style={{ background: '#F9FDFB', border: '1px solid rgba(27,67,50,0.1)' }}>
+          <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest" style={{ color: C.primary }}>
+            <UserPlus size={14} style={{ color: C.accentDark }} /> REGISTRO DE ANIMAL NUEVO
           </div>
-          <div>
-            <label className="label">Nombre (opcional)</label>
-            <input className="input" placeholder="Ej: Manchita, Princesa…"
-              value={nombre} onChange={e => setNombre(e.target.value)} />
-          </div>
-          <div>
-            <label className="label">Hato *</label>
-            <div className="relative">
-              <select className="input appearance-none pr-8" value={hatoId} onChange={e => setHatoId(e.target.value)}>
-                <option value="">— Selecciona el hato</option>
-                {hatos.map(h => <option key={h.id} value={h.id}>{h.nombre} · {h.finca}</option>)}
-              </select>
-              <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: '#B0A090' }} />
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSub }}>Nombre (opcional)</label>
+              <input className={inputClass} style={{ borderColor: 'rgba(27,67,50,0.15)', background: C.white, color: C.primary }} placeholder="Ej: Manchita" value={nombre} onChange={e => setNombre(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSub }}>Hato *</label>
+              <div className="relative">
+                <select className={`${inputClass} appearance-none pr-8`} style={{ borderColor: 'rgba(27,67,50,0.15)', background: C.white, color: C.primary }} value={hatoId} onChange={e => setHatoId(e.target.value)}>
+                  <option value="">— Seleccionar hato</option>
+                  {hatos.map(h => <option key={h.id} value={h.id}>{h.nombre} ({h.finca})</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: C.textSub }} />
+              </div>
             </div>
           </div>
           <button type="button" onClick={confirmarNueva}
-            className="btn-secondary w-full justify-center text-xs py-2">
-            <Check size={13} /> Confirmar vaca nueva
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all active:scale-95"
+            style={{ background: C.primary, color: '#FFFFFF' }}>
+            <Check size={14} /> Confirmar datos
           </button>
         </div>
       )}
@@ -268,167 +608,264 @@ function BuscadorVaca({ onVacaResuelta }) {
   )
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PÁGINA PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
 export default function AnalisisPage() {
-  const [vacaResuelta, setVacaResuelta] = useState(null)
-  const [imgLateral, setImgLateral]     = useState(null)
-  const [imgTrasera, setImgTrasera]     = useState(null)
-  const [notas, setNotas]               = useState('')
-  const [resultado, setResultado]       = useState(null)
-  const [stepActivo, setStepActivo]     = useState(-1)
-  const lateralRef = useRef()
-  const traseraRef = useRef()
+  const [vacaResuelta, setVacaResuelta]         = useState(null)
+  const [imgLateral, setImgLateral]             = useState(null)
+  const [imgTrasera, setImgTrasera]             = useState(null)
+  const [notas, setNotas]                       = useState('')
+  const [resultado, setResultado]               = useState(null)
+  const [isPending, setIsPending]               = useState(false)
+  const [stepActivo, setStepActivo]             = useState(-1)
+  const [modalGuiaAbierto, setModalGuiaAbierto] = useState(false)
+  const [validandoFotos, setValidandoFotos]     = useState(false)
+  const [validacion, setValidacion]             = useState(null)
+  const animationAbortRef = useRef(false)
+  const lateralRef        = useRef()
+  const traseraRef        = useRef()
 
-  const analizar = useMutation({
-    mutationFn: async ({ vaca, imgLateral, imgTrasera, notas }) => {
-      let animalId = vaca.id
-      if (vaca._nuevo) {
-        const res = await animalesApi.crear({ arete: vaca.arete, nombre: vaca.nombre || null, hato_id: vaca.hato_id, raza: 'Jersey' })
-        animalId = res.data.id
-      }
+  useEffect(() => { setValidacion(null) }, [imgLateral, imgTrasera])
+
+  const runAnimation = useCallback(async () => {
+    animationAbortRef.current = false
+    for (let i = 0; i < STEPS.length; i++) {
+      if (animationAbortRef.current) break
+      setStepActivo(i)
+      await new Promise(r => setTimeout(r, 280))
+    }
+  }, [])
+
+  const handleValidarFotos = async () => {
+    if (!imgLateral) return toast.error('Necesitas la foto lateral primero')
+    if (!imgTrasera) return toast.error('Necesitas la foto trasera primero')
+    const [calLat, calTra] = await Promise.all([
+      validarCalidadLocal(imgLateral), validarCalidadLocal(imgTrasera),
+    ])
+    if (!calLat.ok) return toast.error(`Foto lateral: ${calLat.motivo}`, { duration: 5000 })
+    if (!calTra.ok) return toast.error(`Foto trasera: ${calTra.motivo}`, { duration: 5000 })
+    setValidandoFotos(true); setValidacion(null)
+    try {
+      const [latComp, traComp] = await Promise.all([
+        comprimirImagen(imgLateral), comprimirImagen(imgTrasera),
+      ])
       const fd = new FormData()
-      fd.append('animal_id', animalId)
-      fd.append('imagen_lateral', imgLateral)
-      fd.append('imagen_trasera', imgTrasera)
-      if (notas) fd.append('notas', notas)
-      return analisisApi.analizar(fd)
-    },
-    onMutate: async () => {
-      for (let i = 0; i < STEPS.length; i++) {
-        setStepActivo(i)
-        await new Promise(r => setTimeout(r, 600 + Math.random() * 400))
-      }
-    },
-    onSuccess: (res) => { setResultado(res.data); setStepActivo(-1); toast.success('Análisis completado') },
-    onError:   (e)   => { setStepActivo(-1); toast.error(e.response?.data?.detail || 'Error en el análisis') },
-  })
+      fd.append('imagen_lateral', latComp); fd.append('imagen_trasera', traComp)
+      const res = await analisisApi.validar(fd)
+      setValidacion(res.data)
+      if (res.data.par_valido) toast.success('Ambas fotos son aptas para el análisis', { icon: '✅' })
+      else toast.error('Una o ambas fotos necesitan corrección', { icon: '⚠️', duration: 4000 })
+    } catch (err) {
+      console.error('Error al validar fotos:', err)
+      toast.error('Error al validar las fotos', { icon: '❌' })
+    } finally { setValidandoFotos(false) }
+  }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!vacaResuelta) return toast.error('Ingresa el arete de la vaca')
-    if (vacaResuelta._nuevo && !vacaResuelta.hato_id) return toast.error('Confirma los datos de la vaca nueva')
-    if (!imgLateral) return toast.error('Sube la foto lateral')
-    if (!imgTrasera) return toast.error('Sube la foto trasera')
-    analizar.mutate({ vaca: vacaResuelta, imgLateral, imgTrasera, notas })
+    if (!vacaResuelta) return toast.error('Ingrese el arete de la vaca')
+    if (vacaResuelta._nuevo && !vacaResuelta.hato_id) return toast.error('Confirme los datos de la nueva vaca')
+    if (!imgLateral) return toast.error('Suba la fotografía LATERAL')
+    if (!imgTrasera) return toast.error('Suba la fotografía TRASERA')
+    if (!validacion) return toast.error('Valida las fotos antes de iniciar el análisis', { duration: 4000 })
+    if (!validacion.par_valido) return toast.error('Corrige las fotos con errores y valida de nuevo', { duration: 4000 })
+    setResultado(null); setIsPending(true)
+    try {
+      const [apiResult] = await Promise.all([
+        _llamarAPI(vacaResuelta, imgLateral, imgTrasera, notas),
+        runAnimation(),
+      ])
+      setResultado(apiResult.data); setStepActivo(-1)
+      toast.success('Análisis finalizado con éxito', { icon: '📊' })
+    } catch (err) {
+      animationAbortRef.current = true; setStepActivo(-1)
+      toast.error(err.response?.data?.detail || 'Error en el motor de análisis AI', { icon: '❌' })
+    } finally { setIsPending(false) }
+  }
+
+  const _llamarAPI = async (vaca, lateral, trasera, notas) => {
+    let animalId = vaca.id
+    if (vaca._nuevo) {
+      const res = await animalesApi.crear({ arete: vaca.arete, nombre: vaca.nombre || null, hato_id: vaca.hato_id, raza: 'Jersey' })
+      animalId = res.data.id
+    }
+    const [latComp, traComp] = await Promise.all([comprimirImagen(lateral), comprimirImagen(trasera)])
+    const fd = new FormData()
+    fd.append('animal_id', animalId); fd.append('imagen_lateral', latComp)
+    fd.append('imagen_trasera', traComp)
+    if (notas) fd.append('notas', notas)
+    return analisisApi.analizar(fd)
   }
 
   const reset = () => {
     setResultado(null); setImgLateral(null); setImgTrasera(null)
     setVacaResuelta(null); setNotas(''); setStepActivo(-1)
+    setIsPending(false); setValidacion(null)
+    animationAbortRef.current = true
   }
 
-  const bcsColor = resultado ? getBCSColor(resultado.bcs) : null
+  // ✅ FIX PRINCIPAL: normalizar ambos valores antes de usarlos
+  const confianzaPeso = normalizarConfianza(resultado?.confianza_peso ?? resultado?.confianza)
+  const confianzaBcs  = normalizarConfianza(resultado?.confianza_bcs  ?? resultado?.bcs_confianza)
+
+  const bcsInfo      = resultado ? getBCSColor(resultado.bcs) : null
+  const bcsTextColor = bcsInfo?.bg === '#10B981' ? C.primary : '#FFFFFF'
+  const bcsBgColor   = bcsInfo?.bg === '#10B981' ? '#D4ECD9' : bcsInfo?.bg
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto space-y-6 relative z-10">
-      <div>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', color: '#1A1A1A', fontSize: '1.75rem', fontWeight: 900 }}>
-          Nueva Medición
-        </h1>
-        <p className="font-mono text-xs mt-1" style={{ color: '#8B7D6B' }}>
-          ADQUISICIÓN → PROCESAMIENTO → ESTIMACIÓN
-        </p>
-      </div>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto space-y-8 relative z-10 pb-12">
 
-      {/* ── Resultado ── */}
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6"
+        style={{ borderColor: 'rgba(27,67,50,0.1)' }}>
+        <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+          Nueva Estimación AI
+        </h1>
+        {resultado && (
+          <button onClick={reset} className="flex items-center gap-2 px-6 py-3 rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest bg-white hover:bg-gray-50 shadow-sm border border-gray-200"
+            style={{ color: C.primary }}>
+            <RotateCcw size={14} /> NUEVA ENTRADA
+          </button>
+        )}
+      </header>
+
+      {/* ── RESULTADOS ──────────────────────────────────────────────────── */}
       {resultado ? (
-        <div className="space-y-4 animate-slide-up">
-          <div className="card p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#EAF4EE' }}>
-                <CheckCircle2 size={20} style={{ color: '#5C8B6A' }} />
+        <div className="space-y-6 animate-in zoom-in-95 duration-500">
+          <div className="bg-white p-8 shadow-sm border border-emerald-50 rounded-[2rem]">
+
+            {/* Encabezado reporte */}
+            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[rgba(27,67,50,0.1)]">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#E8F8F1' }}>
+                <CheckCircle2 size={24} style={{ color: C.accentDark }} />
               </div>
-              <div>
-                <div style={{ fontFamily: 'Syne, sans-serif', color: '#1A1A1A', fontSize: '1.1rem', fontWeight: 700 }}>
-                  Análisis completado
+              <div className="flex-1">
+                <div style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>Reporte Finalizado</div>
+                <div className="font-mono text-[11px] mt-1 uppercase tracking-wider" style={{ color: C.textSecondary }}>
+                  ID: <span className="font-bold">{vacaResuelta?.arete}</span> · {resultado.procesado_en_segundos?.toFixed(1)}s
                 </div>
-                <div className="font-mono text-xs" style={{ color: '#8B7D6B' }}>
-                  {vacaResuelta?.nombre || vacaResuelta?.arete} · {resultado.procesado_en_segundos}s
-                </div>
+              </div>
+              {/* Badges con valores normalizados */}
+              <div className="hidden sm:flex flex-col gap-1.5 items-end">
+                <ConfianzaBadge valor={confianzaPeso} umbral={PESO_CONFIDENCE_THRESHOLD} label="Peso" />
+                <ConfianzaBadge valor={confianzaBcs}  umbral={BCS_CONFIDENCE_THRESHOLD}  label="BCS"  />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-5">
+            {/* Cards principales */}
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
               {/* Peso */}
-              <div className="rounded-xl p-5 text-center"
-                   style={{ background: '#EAF4EE', border: '0.5px solid #89B99A' }}>
-                <div className="metric-big">{resultado.peso_estimado_kg}</div>
-                <div className="font-mono text-xs mt-1" style={{ color: '#8B7D6B' }}>
-                  kilogramos · ±{Math.round(resultado.peso_estimado_kg * 0.05)} kg
+              <div className="rounded-[1.5rem] p-8 text-center"
+                style={{ background: C.primary, boxShadow: '0 10px 30px rgba(8,28,17,0.15)' }}>
+                <div className="font-mono text-[10px] uppercase tracking-widest mb-2"
+                  style={{ color: C.accent, fontWeight: 700 }}>Peso Corporal Estimado</div>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '4.5rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
+                  {resultado.peso_estimado_kg?.toFixed(0)}
+                  <span style={{ fontSize: '2rem', color: C.accent, fontWeight: 700, marginLeft: '4px' }}>kg</span>
                 </div>
+                <div className="font-mono text-[10px] mt-3 uppercase tracking-wider"
+                  style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  Confianza: {confianzaPeso.toFixed(1)}%
+                </div>
+                <div className="mt-3 h-1.5 rounded-full overflow-hidden relative"
+                  style={{ background: 'rgba(255,255,255,0.15)' }}>
+                  <div className="h-full rounded-full transition-all duration-1000"
+                    style={{ width: `${confianzaPeso}%`, background: confianzaPeso >= PESO_CONFIDENCE_THRESHOLD ? C.accent : C.warning }} />
+                  {/* Marcador del umbral */}
+                  <div className="absolute inset-y-0 w-0.5"
+                    style={{ left: `${PESO_CONFIDENCE_THRESHOLD}%`, background: 'rgba(255,255,255,0.4)' }} />
+                </div>
+                {confianzaPeso < PESO_CONFIDENCE_THRESHOLD && (
+                  <div className="mt-2 font-mono text-[9px] font-bold" style={{ color: C.warning }}>
+                    ⚠ Baja confianza — repita foto lateral
+                  </div>
+                )}
               </div>
+
               {/* BCS */}
-              <div className="rounded-xl p-5 text-center"
-                   style={{
-                     background: bcsColor ? `${bcsColor.bg}` : '#F5F0E8',
-                     border: `0.5px solid ${bcsColor?.bg || '#E0D8C8'}`,
-                   }}>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '3rem', fontWeight: 900, color: bcsColor?.text || '#5C8B6A' }}>
+              <div className="rounded-[1.5rem] p-8 text-center" style={{ background: bcsBgColor }}>
+                <div className="font-mono text-[10px] uppercase tracking-widest mb-2"
+                  style={{ color: bcsTextColor, fontWeight: 700 }}>Condición Corporal (BCS)</div>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '4.5rem', fontWeight: 900, color: bcsTextColor, lineHeight: 1 }}>
                   {resultado.bcs?.toFixed(1)}
                 </div>
-                <div className="font-mono text-xs mt-1" style={{ color: bcsColor?.text || '#8B7D6B' }}>
-                  BCS · {getBCSLabel(resultado.bcs)}
+                <div className="inline-block mt-3 px-4 py-1.5 rounded-lg font-mono text-[10px] font-bold shadow-sm"
+                  style={{ background: 'rgba(255,255,255,0.9)', color: C.primary }}>
+                  {getBCSLabel(resultado.bcs)}
                 </div>
+                <div className="font-mono text-[10px] mt-4 uppercase tracking-wider font-bold"
+                  style={{ color: bcsTextColor, opacity: 0.85 }}>
+                  Confianza: {confianzaBcs.toFixed(1)}%
+                </div>
+                <div className="mt-2 h-1.5 rounded-full overflow-hidden relative"
+                  style={{ background: 'rgba(0,0,0,0.15)' }}>
+                  <div className="h-full rounded-full transition-all duration-1000"
+                    style={{ width: `${confianzaBcs}%`, background: confianzaBcs >= BCS_CONFIDENCE_THRESHOLD ? bcsTextColor : '#7F1D1D' }} />
+                  <div className="absolute inset-y-0 w-0.5"
+                    style={{ left: `${BCS_CONFIDENCE_THRESHOLD}%`, background: 'rgba(0,0,0,0.4)' }} />
+                </div>
+                {confianzaBcs < BCS_CONFIDENCE_THRESHOLD && (
+                  <div className="mt-2 font-mono text-[10px] font-bold" style={{ color: '#7F1D1D' }}>
+                    ⚠ BCS de baja confianza — repita foto trasera
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Escala BCS */}
-            <div className="flex gap-1.5 mb-4">
-              {[1, 2, 3, 3.25, 3.5, 4, 4.5, 5].map(n => {
-                const bcsVal   = resultado.bcs
-                const bcsRound = bcsVal % 1 === 0.5 ? Math.floor(bcsVal) : Math.round(bcsVal)
-                const isActive = bcsRound === n
-                const isNear   = !isActive && Math.abs(n - bcsVal) <= 1
-                return (
-                  <div key={n} className="flex-1 h-7 rounded-lg flex items-center justify-center font-mono text-xs"
-                       style={{
-                         background: isActive
-                           ? '#5C8B6A'
-                           : isNear
-                             ? '#D4ECD9'
-                             : '#F5F0E8',
-                         color: isActive ? 'white' : isNear ? '#2E4D38' : '#C8BBA8',
-                         border: `0.5px solid ${isActive ? '#5C8B6A' : isNear ? '#89B99A' : '#E0D8C8'}`,
-                       }}>
-                    {n}
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Recomendación */}
-            <div className="rounded-xl p-4 mb-4"
-                 style={{ background: '#F5F0E8', border: '0.5px solid #D0C5B0' }}>
-              <div className="font-mono text-xs mb-1" style={{ color: '#5C8B6A' }}>RECOMENDACIÓN</div>
-              <div className="text-sm leading-relaxed" style={{ color: '#1A1A1A', fontFamily: 'Lora, serif' }}>
-                {resultado.recomendacion}
+            <div className="mb-8 p-6 rounded-[1.5rem] bg-[#F9FDFB] border border-[rgba(27,67,50,0.1)]">
+              <div className="font-mono text-[10px] text-center mb-4 font-bold uppercase tracking-widest"
+                style={{ color: C.textSecondary }}>ESCALA JERSEY (1–5)</div>
+              <div className="flex gap-2">
+                {[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(n => {
+                  const isActive = Math.abs(n - resultado.bcs) < 0.125
+                  const isNear   = !isActive && Math.abs(n - resultado.bcs) <= 0.5
+                  return (
+                    <div key={n} className="flex-1 h-10 rounded-lg flex items-center justify-center font-mono text-xs transition-all relative"
+                      style={{ background: isActive ? C.primary : isNear ? '#E8F8F1' : '#FFFFFF', color: isActive ? C.accent : isNear ? C.accentDark : '#9CA3AF', border: `1px solid ${isActive ? C.primary : isNear ? 'rgba(82,217,160,0.3)' : '#E5E7EB'}`, fontWeight: isActive ? 800 : 600, transform: isActive ? 'scale(1.1)' : 'none', zIndex: isActive ? 2 : 1, boxShadow: isActive ? '0 4px 12px rgba(8,28,17,0.2)' : 'none' }}>
+                      {n}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
-            <div className="flex items-center justify-between font-mono text-xs" style={{ color: '#B0A090' }}>
-              <span>Confianza: <span style={{ color: '#5C8B6A' }}>{resultado.confianza?.toFixed(1)}%</span></span>
-              <span>Motor: <span style={{ color: '#89B99A' }}>{resultado.procesado_por ?? 'sam+xgboost'}</span></span>
+            {/* Recomendación nutricional */}
+            <div className="rounded-[1.5rem] p-6 bg-white border border-emerald-100 relative overflow-hidden">
+              <div className="absolute left-0 top-0 bottom-0 w-1"
+                style={{ background: confianzaBcs < BCS_CONFIDENCE_THRESHOLD || confianzaPeso < PESO_CONFIDENCE_THRESHOLD ? C.warning : C.accent }} />
+              <div className="flex items-center gap-2 mb-3">
+                <Info size={16} style={{ color: C.accentDark }} />
+                <div className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: C.accentDark }}>Análisis Nutricional</div>
+              </div>
+              <div className="text-sm leading-relaxed font-sans font-medium" style={{ color: C.primary }}>
+                "{resultado.recomendacion}"
+              </div>
             </div>
           </div>
 
           {/* Morfometría */}
           {resultado.morfometria && (
-            <div className="card p-5 animate-slide-up">
-              <div className="panel-title">Morfometría</div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div className="bg-white p-8 shadow-sm border border-emerald-50 rounded-[2rem]">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
+                <Scale size={20} style={{ color: C.accentDark }} />
+                <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>Análisis Morfométrico</h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
                 {[
-                  ['Largo corporal',     resultado.morfometria.largo_corporal_cm,       'cm'],
-                  ['Alzada a la cruz',   resultado.morfometria.alzada_cm,               'cm'],
-                  ['Perímetro torácico', resultado.morfometria.perimetro_toracico_cm,   'cm'],
-                  ['Ancho de cadera',    resultado.morfometria.ancho_caderas_cm,        'cm'],
-                  ['Prof. torácica',     resultado.morfometria.profundidad_toracica_cm, 'cm'],
-                  ['Longitud grupa',     resultado.morfometria.longitud_grupa_cm,       'cm'],
-                ].map(([label, val, unit]) => val ? (
-                  <div key={label} className="rounded-xl p-3"
-                       style={{ background: '#F5F0E8', border: '0.5px solid #E0D8C8' }}>
-                    <div className="font-mono text-xs mb-1" style={{ color: '#8B7D6B' }}>{label}</div>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.25rem', fontWeight: 700, color: '#1A1A1A' }}>
-                      {val} <span className="font-mono text-xs" style={{ color: '#B0A090' }}>{unit}</span>
+                  ['Largo corporal',     resultado.morfometria.largo_corporal_cm],
+                  ['Alzada a la cruz',   resultado.morfometria.alzada_cm],
+                  ['Perímetro torácico', resultado.morfometria.perimetro_toracico_cm],
+                  ['Ancho de cadera',    resultado.morfometria.ancho_caderas_cm],
+                  ['Profund. torácica',  resultado.morfometria.profundidad_toracica_cm],
+                  ['Longitud de grupa',  resultado.morfometria.longitud_grupa_cm],
+                ].map(([label, val]) => val ? (
+                  <div key={label} className="rounded-xl p-5 bg-[#F9FDFB] border border-[rgba(27,67,50,0.1)]">
+                    <div className="font-mono text-[10px] mb-1 uppercase tracking-widest font-bold"
+                      style={{ color: C.textSecondary }}>{label}</div>
+                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.6rem', fontWeight: 800, color: C.primary, lineHeight: 1 }}>
+                      {val.toFixed(1)} <span className="font-mono text-xs" style={{ color: C.textSecondary }}>cm</span>
                     </div>
                   </div>
                 ) : null)}
@@ -436,102 +873,143 @@ export default function AnalisisPage() {
             </div>
           )}
 
-          <button onClick={reset} className="btn-secondary w-full justify-center">
-            <RotateCcw size={14} /> Nueva medición
-          </button>
+          {/* ✅ NUEVO: Comparador de peso real */}
+          <ComparadorPesoReal pesoEstimado={resultado.peso_estimado_kg} />
+
         </div>
 
       ) : (
-        <div className="space-y-4">
-
-          {/* Processing */}
-          {analizar.isPending && (
-            <div className="card p-8 animate-fade-in">
-              <div className="flex flex-col items-center gap-6">
-                <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center"
-                     style={{ borderColor: '#D4ECD9' }}>
-                  <div className="w-2 h-8 rounded-full scan-anim"
-                       style={{ background: 'linear-gradient(180deg, transparent, #5C8B6A, transparent)' }} />
+        /* ── FORMULARIO / ANIMACIÓN ──────────────────────────────────── */
+        <div className="space-y-6">
+          {isPending && (
+            <div className="bg-white p-12 rounded-[2rem] shadow-xl border border-emerald-50 text-center animate-in zoom-in-95">
+              <div className="flex flex-col items-center gap-8">
+                <div className="relative w-24 h-24 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-4 animate-spin"
+                    style={{ borderColor: `${C.accent}20`, borderTopColor: C.accentDark, animationDuration: '1.5s' }} />
+                  <Scale size={32} style={{ color: C.accentDark }} className="animate-pulse" />
                 </div>
-                <div className="w-full max-w-xs space-y-2">
-                  {STEPS.map((s, i) => (
-                    <div key={s} className="flex items-center gap-3 font-mono text-xs transition-all duration-300"
-                         style={{
-                           color: i < stepActivo
-                             ? '#5C8B6A'
-                             : i === stepActivo
-                               ? '#1A1A1A'
-                               : '#C8BBA8',
-                         }}>
-                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                           style={{
-                             background: i < stepActivo ? '#5C8B6A' : i === stepActivo ? '#89B99A' : '#E0D8C8',
-                             animation: i === stepActivo ? 'pulse 0.8s ease-in-out infinite' : undefined,
-                           }} />
-                      {s}
-                    </div>
-                  ))}
+                <div className="w-full max-w-sm space-y-4 bg-[#F9FDFB] p-8 rounded-2xl border border-[rgba(27,67,50,0.1)]">
+                  <div className="font-mono text-[10px] font-bold mb-4 uppercase tracking-widest" style={{ color: C.primary }}>
+                    EJECUTANDO PIPELINE NEURAL
+                  </div>
+                  {STEPS.map((s, i) => {
+                    const done = i < stepActivo; const active = i === stepActivo
+                    return (
+                      <div key={s} className="flex items-center gap-4 font-mono text-[11px] transition-all"
+                        style={{ color: done ? C.accentDark : active ? C.primary : '#9CA3AF', fontWeight: active ? 700 : 500, opacity: done || active ? 1 : 0.5 }}>
+                        <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all"
+                          style={{ background: done ? '#E8F8F1' : active ? C.primary : 'transparent', border: `1px solid ${done ? C.accentDark : active ? C.primary : '#E5E7EB'}` }}>
+                          {done ? <Check size={10} style={{ color: C.accentDark }} strokeWidth={4} />
+                            : <div className={`w-1.5 h-1.5 rounded-full ${active ? 'animate-pulse' : ''}`}
+                                style={{ background: active ? C.accent : 'transparent' }} />}
+                        </div>
+                        {s}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
           )}
 
-          {!analizar.isPending && (
-            <form onSubmit={handleSubmit} className="card p-6 space-y-5">
+          {!isPending && (
+            <form onSubmit={handleSubmit} className="space-y-6">
 
-              {/* Sección 1 */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 rounded-md flex items-center justify-center font-mono text-xs font-bold"
-                       style={{ background: '#D4ECD9', color: '#2E4D38' }}>1</div>
-                  <span className="font-mono text-xs uppercase tracking-widest" style={{ color: '#5C8B6A' }}>
-                    Identificación
-                  </span>
+              {/* Paso 1 */}
+              <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-emerald-50">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[11px] font-bold"
+                    style={{ background: '#E8F8F1', color: C.accentDark }}>1</div>
+                  <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
+                    Identificación Bovina
+                  </h2>
                 </div>
                 <BuscadorVaca onVacaResuelta={setVacaResuelta} />
-              </div>
+              </section>
 
-              <div style={{ borderTop: '0.5px solid #E8E0D0' }} />
-
-              {/* Sección 2 */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 rounded-md flex items-center justify-center font-mono text-xs font-bold"
-                       style={{ background: '#D4ECD9', color: '#2E4D38' }}>2</div>
-                  <span className="font-mono text-xs uppercase tracking-widest" style={{ color: '#5C8B6A' }}>
-                    Fotografías
-                  </span>
+              {/* Paso 2 */}
+              <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-emerald-50">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[11px] font-bold"
+                      style={{ background: '#E8F8F1', color: C.accentDark }}>2</div>
+                    <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
+                      Adquisición de Imágenes
+                    </h2>
+                  </div>
+                  <button type="button" onClick={() => setModalGuiaAbierto(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest border shadow-sm hover:-translate-y-0.5 transition-all"
+                    style={{ color: C.accentDark, background: '#F9FDFB', borderColor: 'rgba(82,217,160,0.3)' }}>
+                    <BookOpen size={14} /> ¿Cómo tomar fotos?
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                <div className="grid md:grid-cols-2 gap-8 mb-6">
                   <FotoLateral file={imgLateral} onChange={setImgLateral} inputRef={lateralRef} />
-                  <FotoUpload  label="📸 Foto trasera *" hint="Vista posterior · Grupa centrada"
-                               file={imgTrasera} onChange={setImgTrasera} inputRef={traseraRef} />
+                  <FotoUpload label="📸 Foto trasera (Grupa/BCS) *" hint="Vista Posterior"
+                    file={imgTrasera} onChange={setImgTrasera} inputRef={traseraRef} />
                 </div>
-              </div>
 
-              <div style={{ borderTop: '0.5px solid #E8E0D0' }} />
+                {(imgLateral && imgTrasera) && (
+                  <div className="space-y-4">
+                    <button type="button" onClick={handleValidarFotos} disabled={validandoFotos}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all border-2 hover:-translate-y-0.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                      style={{
+                        background: validacion?.par_valido ? '#E8F8F1' : validacion && !validacion.par_valido ? C.errorBg : '#F9FDFB',
+                        borderColor: validacion?.par_valido ? C.accentDark : validacion && !validacion.par_valido ? '#FECACA' : 'rgba(27,67,50,0.2)',
+                        color: validacion?.par_valido ? C.accentDark : validacion && !validacion.par_valido ? C.error : C.primary,
+                      }}>
+                      {validandoFotos ? <><Loader2 size={15} className="animate-spin" /> Analizando fotos con YOLOv8…</>
+                        : validacion?.par_valido ? <><ShieldCheck size={15} /> Fotos validadas — listas para el análisis</>
+                        : validacion && !validacion.par_valido ? <><RefreshCw size={15} /> Re-validar fotos corregidas</>
+                        : <><ShieldCheck size={15} /> Validar calidad de fotos</>}
+                    </button>
+                    {validacion && (
+                      <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                        <ValidacionFotoCard titulo="Foto Lateral" resultado={validacion.lateral} onRetomar={() => lateralRef.current?.click()} />
+                        <ValidacionFotoCard titulo="Foto Trasera" resultado={validacion.trasera} onRetomar={() => traseraRef.current?.click()} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
 
-              {/* Sección 3 */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 rounded-md flex items-center justify-center font-mono text-xs font-bold"
-                       style={{ background: '#D4ECD9', color: '#2E4D38' }}>3</div>
-                  <span className="font-mono text-xs uppercase tracking-widest" style={{ color: '#5C8B6A' }}>
-                    Notas
-                  </span>
+              {/* Paso 3 */}
+              <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-emerald-50">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[11px] font-bold"
+                    style={{ background: '#E8F8F1', color: C.accentDark }}>3</div>
+                  <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
+                    Contexto de Campo (Opcional)
+                  </h2>
                 </div>
-                <textarea className="input resize-none" rows={2}
-                  placeholder="Observaciones opcionales sobre esta medición…"
+                <textarea className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all font-sans text-sm resize-none"
+                  rows={3} style={{ borderColor: 'rgba(27,67,50,0.15)', background: '#F9FDFB', color: C.primary }}
+                  placeholder="Ej: Vaca en periodo de lactancia, tomada post-ordeño…"
                   value={notas} onChange={e => setNotas(e.target.value)} />
-              </div>
+              </section>
 
-              <button type="submit" className="btn-primary w-full justify-center py-3">
-                <Scale size={16} /> Estimar peso y BCS
-              </button>
+              <div className="space-y-2">
+                <button type="submit" disabled={!validacion?.par_valido}
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-mono text-xs font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-lg"
+                  style={{ background: C.primary, color: '#FFFFFF' }}>
+                  <Scale size={18} style={{ color: validacion?.par_valido ? C.accent : 'rgba(255,255,255,0.4)' }} />
+                  Ejecutar Motor de Estimación
+                </button>
+                {(!validacion || !validacion.par_valido) && imgLateral && imgTrasera && (
+                  <p className="text-center font-mono text-[10px] uppercase tracking-wider" style={{ color: C.textSub }}>
+                    {!validacion ? '↑ Valida las fotos primero para habilitar el análisis'
+                      : '↑ Corrige las fotos marcadas y re-valida para continuar'}
+                  </p>
+                )}
+              </div>
             </form>
           )}
         </div>
       )}
+
+      <GuiaCaptura open={modalGuiaAbierto} onClose={() => setModalGuiaAbierto(false)} />
     </div>
   )
 }

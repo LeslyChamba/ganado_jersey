@@ -3,41 +3,46 @@
 @tailwind utilities;
 
 /* =====================================================
-   TOKENS DE COLOR — Paleta Pradera Luminosa (Variante 2)
+   TOKENS DE COLOR — Paleta JER-WEIGHT (Estilo Login)
    
-   --cream-50:  #F5F0E8  (fondo app)
-   --cream-100: #EDE7DA  (surface / sidebar)
-   --cream-200: #E0D8C8  (borders)
-   --cream-300: #D0C5B0  (borders hover)
-   --green-600: #2E4D38  (texto primario verde, logo)
-   --green-500: #5C8B6A  (acción primaria)
-   --green-400: #89B99A  (acento medio)
-   --green-100: #D4ECD9  (fills claro, badge activo)
-   --amber-500: #C8914A  (acento cálido, alertas leves)
-   --amber-100: #F5E6CC  (fill badge ámbar)
-   --text-dark:  #1A1A1A
-   --text-mid:   #5A4E3C
-   --text-muted: #8B7D6B
+   --color-primary:        #081C11 (Verde oscuro, fondos fuertes, títulos)
+   --color-accent:         #52D9A0 (Verde neón, destacar, hover)
+   --color-accent-dark:    #1B4332 (Verde bosque, bordes, elementos secundarios)
+   --color-text-sec:       #2A5C3A (Texto secundario, labels)
+   --color-bg:             #F0FBF6 (Fondo general de la app)
+   --color-white:          #FFFFFF (Tarjetas)
 ===================================================== */
+
+:root {
+  --color-primary: #081C11;
+  --color-accent: #52D9A0;
+  --color-accent-dark: #1B4332;
+  --color-text-sec: #2A5C3A;
+  --color-bg: #F0FBF6;
+  --color-white: #FFFFFF;
+  --color-error: #C0392B;
+  --color-warning: #F5C542;
+}
 
 @layer base {
   * { box-sizing: border-box; }
 
   body {
-    background: #F5F0E8;
-    color: #1A1A1A;
+    background-color: var(--color-bg);
+    color: var(--color-primary);
     font-family: 'Lora', serif;
     min-height: 100vh;
     overflow-x: hidden;
   }
 
+  /* Efecto de fondo sutil (Opcional, le da textura al fondo F0FBF6) */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 65% 50% at 10% 5%,  rgba(92,139,106,0.08) 0%, transparent 55%),
-      radial-gradient(ellipse 55% 45% at 90% 90%, rgba(200,145,74,0.07) 0%, transparent 55%);
+      radial-gradient(ellipse 60% 50% at 50% 0%, rgba(82, 217, 160, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 50% at 100% 100%, rgba(27, 67, 50, 0.03) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
   }
@@ -46,107 +51,112 @@
 }
 
 /* =====================================================
-   COMPONENTES
+   COMPONENTES (Sincronizados con el Login)
 ===================================================== */
 @layer components {
 
-  /* Cards — blanco sobre crema */
+  /* CARDS — Tarjetas blancas con sombras elegantes */
   .card {
-    background: #FFFFFF;
-    border: 0.5px solid #E0D8C8;
-    box-shadow: 0 2px 12px rgba(46,77,56,0.06);
-    @apply rounded-2xl;
+    background: var(--color-white);
+    border: 1px solid rgba(82, 217, 160, 0.15); /* Borde sutil del color accent */
+    box-shadow: 0 15px 40px rgba(8, 28, 17, 0.04);
+    @apply rounded-3xl transition-all duration-300;
   }
 
   /* BOTÓN PRINCIPAL */
   .btn-primary {
-    background: #5C8B6A;
-    box-shadow: 0 4px 14px rgba(46,77,56,0.18);
-    @apply text-white font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl
-           hover:-translate-y-px transition-all duration-150 active:scale-95 border-0 cursor-pointer
-           flex items-center gap-2;
+    background: var(--color-primary);
+    box-shadow: 0 10px 20px rgba(8, 28, 17, 0.15);
+    color: var(--color-white);
+    @apply font-mono text-sm font-bold uppercase tracking-[0.2em] px-6 py-3.5 rounded-xl
+           hover:-translate-y-1 transition-all duration-200 active:scale-95 border-0 cursor-pointer
+           flex items-center justify-center gap-2;
   }
 
   .btn-primary:hover {
-    background: #4A7A59;
-    box-shadow: 0 6px 20px rgba(46,77,56,0.25);
+    background: var(--color-accent-dark);
+    box-shadow: 0 14px 24px rgba(8, 28, 17, 0.25);
   }
 
   .btn-primary:disabled {
-    opacity: 0.5;
+    background: #A0AEC0;
+    box-shadow: none;
     cursor: not-allowed;
     transform: none;
   }
 
-  /* BOTÓN SECUNDARIO */
+  /* BOTÓN SECUNDARIO (Para cancelar o editar) */
   .btn-secondary {
-    background: #F5F0E8;
-    border: 0.5px solid #D0C5B0;
-    color: #5A4E3C;
-    @apply font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl
-           hover:border-[#89B99A] hover:bg-[#EDE7DA]
-           transition-all duration-200 active:scale-95 cursor-pointer
-           flex items-center gap-2;
+    background: transparent;
+    border: 1px solid rgba(27, 67, 50, 0.2);
+    color: var(--color-primary);
+    @apply font-mono text-xs uppercase font-bold tracking-[0.1em] px-5 py-3 rounded-xl
+           hover:bg-[#E2F7ED] hover:border-[var(--color-accent)] transition-all duration-200 
+           active:scale-95 cursor-pointer flex items-center justify-center gap-2;
   }
 
-  /* INPUTS */
+  /* INPUTS Y SELECTS */
   .input {
-    background: #FFFFFF;
-    border: 0.5px solid #D0C5B0;
-    color: #1A1A1A;
-    @apply w-full px-4 py-2.5 rounded-xl placeholder-[#B0A090]
-           font-mono text-sm focus:outline-none transition-all duration-150;
+    background: #F9FDFB;
+    border: 1px solid rgba(27, 67, 50, 0.15);
+    color: var(--color-primary);
+    font-family: sans-serif;
+    @apply w-full px-5 py-3.5 rounded-xl text-sm transition-all duration-200 focus:outline-none;
   }
 
   .input:focus {
-    border-color: #89B99A;
-    box-shadow: 0 0 0 3px rgba(137,185,154,0.18);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 4px rgba(82, 217, 160, 0.15);
   }
 
   select.input option {
-    background: #FFFFFF;
-    color: #1A1A1A;
+    background: var(--color-white);
+    color: var(--color-primary);
   }
 
-  /* LABELS */
+  /* LABELS DE LOS FORMULARIOS */
   .label {
     font-family: 'JetBrains Mono', monospace;
-    color: #8B7D6B;
-    @apply block text-xs uppercase tracking-widest mb-1.5;
+    color: var(--color-text-sec);
+    @apply block text-[0.65rem] uppercase font-bold tracking-[0.1em] mb-1.5 ml-1;
   }
 
-  /* TITULO PANEL */
+  /* TÍTULOS DE PANELES (Con línea decorativa neón) */
   .panel-title {
     font-family: 'JetBrains Mono', monospace;
-    color: #5C8B6A;
-    @apply text-xs uppercase tracking-widest flex items-center gap-2 mb-4;
+    color: var(--color-primary);
+    @apply text-xs uppercase font-bold tracking-[0.15em] flex items-center gap-3 mb-6;
   }
 
   .panel-title::after {
     content: '';
     flex: 1;
-    height: 0.5px;
-    background: linear-gradient(to right, #D4ECD9, transparent);
+    height: 2px;
+    background: linear-gradient(to right, var(--color-accent), transparent);
+    opacity: 0.6;
+    border-radius: 2px;
   }
 
-  /* MÉTRICAS GRANDES */
+  /* MÉTRICAS GRANDES (Dashboard) */
   .metric-big {
     font-family: 'Syne', sans-serif;
-    background: linear-gradient(135deg, #1A1A1A, #2E4D38);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    @apply text-5xl font-black leading-none;
+    color: var(--color-primary);
+    @apply text-5xl font-black leading-none tracking-tight;
   }
 }
 
 /* =====================================================
    SCROLLBAR
 ===================================================== */
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #C8D8C0;
-  border-radius: 3px;
+  background: var(--color-accent-dark);
+  border-radius: 10px;
+  opacity: 0.5;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
 }
 
 /* =====================================================
@@ -154,13 +164,8 @@
 ===================================================== */
 @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes pulse   { 0%, 100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.5); opacity: 0.6 } }
 @keyframes scan    { 0% { transform: translateY(-30px); opacity: 0 } 50% { opacity: 1 } 100% { transform: translateY(30px); opacity: 0 } }
 
 .animate-fade-in  { animation: fadeIn  0.35s ease both; }
 .animate-slide-up { animation: slideUp 0.35s ease both; }
-.delay-100 { animation-delay: 100ms; }
-.delay-200 { animation-delay: 200ms; }
-.delay-300 { animation-delay: 300ms; }
-.delay-400 { animation-delay: 400ms; }
 .scan-anim { animation: scan 1.5s ease-in-out infinite; }
