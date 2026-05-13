@@ -8,7 +8,7 @@ import {
   ShieldAlert, ShieldCheck, Loader2, XCircle, RefreshCw,
   Ruler, TrendingDown, TrendingUp, Minus
 } from 'lucide-react'
-import GuiaCaptura from './GuiaCaptura'
+import GuiaCaptura from './Guiacaptura'
 
 // ─── Tokens de Color ──────────────────────────────────────────────────────
 const C = {
