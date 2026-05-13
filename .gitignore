@@ -1,28 +1,44 @@
-# Dependencias de Node
+# --- Seguridad ---
+.env
+*.env
+secrets.json
+
+# --- Python & Backend ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+
+# --- Node/Frontend ---
 node_modules/
 dist/
+build/
 npm-debug.log*
 
-# Entornos virtuales de Python (por si acaso)
-venv/
-.env
+# --- Archivos del Sistema ---
+.DS_Store
+Thumbs.db
 
-# Archivos pesados de datos e imágenes
+# --- Datos y Multimedia (Para que el repo no sea pesado) ---
 *.jpg
 *.png
 *.jpeg
-*mp4
-*ini
-*csv
-*txt
-__pycache__/
-*.pyc
-*.pth
-*.pt
-/Jersey-Prediccion/models_pt/
-/Jersey-Prediccion/debug_batch/
-/Jersey-Prediccion/debug_lateral/
-/Jersey-Prediccion/fotos_vacas/
-/Jersey-Prediccion/debug_pt_rob/
+*.mp4
+*.csv
+*.ini
+# NO bloqueamos .txt para permitir requirements.txt
+
+# --- Carpetas de Datos de Tesis ---
 /dataset/
-/venv/
+/Jersey-Prediccion/debug_*/
+/Jersey-Prediccion/fotos_vacas/
+/uploads/
+
+# --- Modelos de IA ---
+# Solo comenta estas líneas si decides usar Git LFS o subirlos manualmente.
+# Si los archivos .pt están dentro de tu carpeta 'app', asegúrate de que se suban.
+# *.pt 
+# *.pth

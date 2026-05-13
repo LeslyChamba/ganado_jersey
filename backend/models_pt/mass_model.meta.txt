@@ -1,0 +1,5 @@
+features=ratio_lh,htor_norm,cad_norm,perim_norm,area_norm,bcs,volumen,lc_real,pt_real
+lc_real=True
+pt_real=True
+mae_cv=8.99
+r2_cv=0.962
