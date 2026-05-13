@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,6 +18,7 @@ from app.controllers.reportes_controller import router as reporte_router
 from app.controllers.dashboard_controller import router as dashboard_router
 from app.controllers.bovinos_controller import router as bovinos_router
 from app.core.model_loader import descargar_modelos
+
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -27,19 +30,24 @@ logger = logging.getLogger("jer-weight")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Iniciando JER-WEIGHT v{settings.APP_VERSION}")
-         # ✅ Descargar modelos al arrancar
-    descargar_modelos()
-    if settings.ENVIRONMENT == "development":
-        # Solo como fallback rápido en dev — en producción usar: alembic upgrade head
-        Base.metadata.create_all(bind=engine)
-        logger.info("✅ Tablas verificadas (dev mode)")
 
     Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
     logger.info(f"📁 Directorio de imágenes: {settings.UPLOAD_DIR}")
 
+    if settings.ENVIRONMENT == "development":
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Tablas verificadas (dev mode)")
+
+    # Cargar modelos en background — no bloquea el arranque del servidor
+    loop = asyncio.get_event_loop()
+    executor = ThreadPoolExecutor(max_workers=1)
+    loop.run_in_executor(executor, descargar_modelos)
+    logger.info("⏳ Modelos cargando en background...")
+
     yield
 
     logger.info("🛑 Apagando JER-WEIGHT...")
+
 
 app = FastAPI(
     title="JER-WEIGHT API",
@@ -67,10 +75,13 @@ mediante análisis de imágenes con visión por computadora.
     lifespan=lifespan,
 )
 
+# ── CORS ─────────────────────────────────────────────────────────────────────
+# allow_origins=["*"] con allow_credentials=False permite cualquier origen
+# Cámbialo a la lista específica cuando todo funcione
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS_LIST,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -85,8 +96,11 @@ app.include_router(hato_router,      prefix=API_PREFIX)
 app.include_router(animal_router,    prefix=API_PREFIX)
 app.include_router(analisis_router,  prefix=API_PREFIX)
 app.include_router(reporte_router,   prefix=API_PREFIX)
-app.include_router(bovinos_router, prefix=API_PREFIX)
+app.include_router(bovinos_router,   prefix=API_PREFIX)
 app.include_router(dashboard_router, prefix=API_PREFIX)
+
+
+@app.get("/", tags=["Sistema"])
 def raiz():
     return {
         "sistema": "JER-WEIGHT",
@@ -116,7 +130,9 @@ def health_check():
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
     }
-@app.get("/api/v1/health", tags=["Sistema"])  # ← agregar esta ruta
+
+
+@app.get("/api/v1/health", tags=["Sistema"])
 def health_check_v1():
     from sqlalchemy import text
     from app.db.database import SessionLocal
@@ -132,6 +148,3 @@ def health_check_v1():
         "status": "ok" if db_ok else "degraded",
         "database": "conectada" if db_ok else "sin conexión",
     }
-
-
-
