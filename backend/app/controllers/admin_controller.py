@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.core.encryption import decrypt
 from app.core.security import get_password_hash
 from app.controllers.auth_controller import require_admin
 from app.db.database import get_db
@@ -15,12 +14,11 @@ from app.models.models import (
     AccionAuditoria, Animal, Hato, Medicion, RolUsuario, Usuario
 )
 from app.services.auditoria_service import registrar_log
-from sqlalchemy import func
+
 router = APIRouter(prefix="/admin", tags=["Administración de Usuarios"])
 
 
 class UsuarioAdminCreate(BaseModel):
-    """Admin crea un usuario con cualquier rol."""
     email:    EmailStr
     password: str
     nombre:   str
@@ -37,7 +35,6 @@ class UsuarioAdminCreate(BaseModel):
 
 
 class UsuarioAdminUpdate(BaseModel):
-    """Editar datos básicos — sin tocar rol ni estado."""
     nombre:   Optional[str]      = None
     apellido: Optional[str]      = None
     telefono: Optional[str]      = None
@@ -60,22 +57,10 @@ class UsuarioAdminResponse(BaseModel):
     telefono:         Optional[str]
     rol:              RolUsuario
     activo:           bool
-    # conteos de actividad del usuario
     total_hatos:      int = 0
     total_animales:   int = 0
     total_mediciones: int = 0
 
-    @field_validator("email", "nombre", mode="before")
-    @classmethod
-    def desencriptar_admin(cls, v):
-        if not v:
-            return v
-        try:
-            return decrypt(v)
-        except Exception:
-            # Si son los datos legacy que no estaban encriptados, los pasa tal cual
-            return v
-        
     model_config = {"from_attributes": True}
 
 
@@ -123,7 +108,6 @@ def listar_usuarios(
     db:     Session              = Depends(get_db),
     _:      Usuario              = Depends(require_admin),
 ):
-    """Lista todos los usuarios. Filtra por ?rol=GANADERO, ?activo=true, ?buscar=texto"""
     q = db.query(Usuario)
     if rol    is not None: q = q.filter(Usuario.rol    == rol)
     if activo is not None: q = q.filter(Usuario.activo == activo)
@@ -153,7 +137,6 @@ def crear_usuario_admin(
     db:      Session = Depends(get_db),
     admin:   Usuario = Depends(require_admin),
 ):
-    """Admin crea usuarios (ADMIN o GANADERO) sin auto-registro."""
     if db.query(Usuario).filter(Usuario.email == datos.email).first():
         raise HTTPException(400, "Ya existe una cuenta con ese correo electrónico")
 
@@ -192,7 +175,6 @@ def actualizar_usuario(
     db:         Session = Depends(get_db),
     admin:      Usuario = Depends(require_admin),
 ):
-    """Edita nombre, apellido, teléfono o email."""
     usuario = _get_usuario_o_404(usuario_id, db)
     antes   = {"nombre": usuario.nombre, "apellido": usuario.apellido,
                 "email": usuario.email,  "telefono": usuario.telefono}
@@ -223,7 +205,6 @@ def cambiar_rol(
     db:         Session = Depends(get_db),
     admin:      Usuario = Depends(require_admin),
 ):
-    """Cambia rol ADMIN ↔ GANADERO. No puedes cambiar tu propio rol."""
     if usuario_id == admin.id:
         raise HTTPException(400, "No puedes cambiar tu propio rol")
 
@@ -250,7 +231,6 @@ def cambiar_estado(
     db:         Session = Depends(get_db),
     admin:      Usuario = Depends(require_admin),
 ):
-    """Activa o desactiva la cuenta sin eliminarla."""
     if usuario_id == admin.id and not datos.activo:
         raise HTTPException(400, "No puedes desactivar tu propia cuenta")
 
@@ -277,21 +257,14 @@ def eliminar_usuario(
     db:         Session = Depends(get_db),
     admin:      Usuario = Depends(require_admin),
 ):
-    """
-    Elimina permanentemente. 
-    REGLAS: 
-    1. No puedes borrarte a ti mismo.
-    2. El usuario DEBE estar inactivo primero.
-    3. Se desvinculan logs para evitar error de llave foránea.
-    """
     if usuario_id == admin.id:
         raise HTTPException(400, "No puedes eliminar tu propia cuenta")
 
     usuario = _get_usuario_o_404(usuario_id, db)
-    # --- REGLA SOLICITADA: Solo borrar si está inactivo ---
+
     if usuario.activo:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="No se puede eliminar un usuario ACTIVO. Primero debe desactivar la cuenta."
         )
     if db.query(Hato).filter(
@@ -302,9 +275,10 @@ def eliminar_usuario(
             "No se puede eliminar: el usuario tiene hatos activos. "
             "Desactívalos primero o reasígnalos."
         )
-    from app.models.models import AuditoriaLog # Asegúrate de importar tu modelo de logs
+
+    from app.models.models import AuditoriaLog
     db.query(AuditoriaLog).filter(AuditoriaLog.usuario_id == usuario_id).update({"usuario_id": None})
-    
+
     registrar_log(
         db=db, accion=AccionAuditoria.ELIMINAR,
         usuario_id=admin.id, usuario_email=admin.email,
@@ -317,43 +291,22 @@ def eliminar_usuario(
 
 @router.get("/bovinos/stats")
 def stats_globales_bovinos(db: Session = Depends(get_db)):
-        total = db.query(Animal).count()
-        
-        # Calculamos promedios y límites
-        stats = db.query(
-            func.avg(Medicion.peso_estimado_kg).label("peso_prom"),
-            func.avg(Medicion.bcs).label("bcs_prom"),
-            func.min(Medicion.peso_estimado_kg).label("peso_min"),
-            func.max(Medicion.peso_estimado_kg).label("peso_max"),
-        ).first()
+    total = db.query(Animal).count()
 
-        en_alerta = db.query(Medicion).filter(Medicion.bcs < 2.5).count()
+    stats = db.query(
+        func.avg(Medicion.peso_estimado_kg).label("peso_prom"),
+        func.avg(Medicion.bcs).label("bcs_prom"),
+        func.min(Medicion.peso_estimado_kg).label("peso_min"),
+        func.max(Medicion.peso_estimado_kg).label("peso_max"),
+    ).first()
 
-        return {
-            "total": total,
-            "peso_promedio": round(stats.peso_prom, 1) if stats.peso_prom else 0,
-            "bcs_promedio": round(stats.bcs_prom, 1) if stats.bcs_prom else 0,
-            "peso_min": round(stats.peso_min, 1) if stats.peso_min else 0,
-            "peso_max": round(stats.peso_max, 1) if stats.peso_max else 0,
-            "en_alerta": en_alerta
-        }
+    en_alerta = db.query(Medicion).filter(Medicion.bcs < 2.5).count()
 
-@router.get("/usuarios")
-def listar_todos_los_usuarios(db: Session = Depends(get_db)):
-    usuarios = db.query(Usuario).all()
-    
-    # 🚨 EL ESCUDO PROTECTOR PARA DESENCRIPTAR SIN CHOCAR 🚨
-    for u in usuarios:
-        if u.email:
-            try:
-                u.email = decrypt(u.email)
-            except Exception:
-                pass # Si falla, lo deja como texto normal
-                
-        if u.nombre:
-            try:
-                u.nombre = decrypt(u.nombre)
-            except Exception:
-                pass
-
-    return usuarios
+    return {
+        "total":        total,
+        "peso_promedio": round(stats.peso_prom, 1) if stats.peso_prom else 0,
+        "bcs_promedio":  round(stats.bcs_prom,  1) if stats.bcs_prom  else 0,
+        "peso_min":      round(stats.peso_min,   1) if stats.peso_min  else 0,
+        "peso_max":      round(stats.peso_max,   1) if stats.peso_max  else 0,
+        "en_alerta":     en_alerta,
+    }
