@@ -4,7 +4,7 @@ import { authApi } from '../services/api'
 import useAuthStore from '../store/authStore'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff, AlertTriangle, Lock, ArrowRight } from 'lucide-react'
-import logoVacas from '../../img/logo_vacas.png'
+import logoVacas from '../../img/Logo_vacas.png'
 
 /* ── Tokens de color (Sincronizados con Layout) ── */
 const C = {
