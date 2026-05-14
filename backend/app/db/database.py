@@ -7,13 +7,10 @@ from app.core.config import settings
 # ─── Engine ─────────────────────────────────────────────────────────────────
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,          # Verifica conexión antes de usarla
-    pool_size=10,                # Conexiones en el pool
-    max_overflow=20,             # Conexiones adicionales bajo carga
-    pool_recycle=3600,           # Reciclar conexiones cada hora
-    echo=settings.DEBUG,         # Log SQL en desarrollo
+    poolclass=NullPool,    
+    pool_pre_ping=True,
+    echo=settings.DEBUG,
 )
-
 # ─── Session factory ────────────────────────────────────────────────────────
 SessionLocal = sessionmaker(
     autocommit=False,
