@@ -16,9 +16,8 @@ logger = logging.getLogger(__name__)
 # ── Rutas relativas al archivo — funcionan en cualquier máquina / Docker ──
 PROYECTO_DIR = Path(__file__).resolve().parent.parent.parent  # /backend
 MODELS_DIR   = PROYECTO_DIR / "models_pt"
-SAM_MODEL    = MODELS_DIR / "sam_vit_b.pth"
-BCS_MODEL    = MODELS_DIR / "best.pt"
-
+SAM_MODEL = MODELS_DIR / "sam_checkpoint.pth"
+BCS_MODEL = MODELS_DIR / "BCS" / "best_BCS.pt"
 
 # ── SAM ──────────────────────────────────────────────────────────────────────
 def segmentar_con_sam(image_bgr):
