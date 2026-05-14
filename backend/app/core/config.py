@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from typing import List
@@ -7,8 +8,8 @@ class Settings(BaseSettings):
     # Base
     APP_NAME: str = "JER-WEIGHT"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
-    ENVIRONMENT: str = "development"
+    DEBUG: bool = False
+    ENVIRONMENT: str = "production"
 
     # Seguridad
     SECRET_KEY: str
@@ -55,8 +56,7 @@ class Settings(BaseSettings):
     ROBOFLOW_MODEL_VERSION: int = 1
 
     # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
-
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://ganado-jersey.vercel.app"
     ENCRYPTION_KEY: str  # ← agregar esta línea
 
     model_config = SettingsConfigDict(
@@ -67,13 +67,16 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
-        # Usa DB_* como fuente principal
         user = self.DB_USER or self.POSTGRES_USER
         password = self.DB_PASSWORD or self.POSTGRES_PASSWORD
         host = self.DB_HOST or self.POSTGRES_HOST or "localhost"
         port = self.DB_PORT or self.POSTGRES_PORT or 5432
         db = self.DB_NAME or self.POSTGRES_DB
-        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+
+        return (
+            f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
+            "?sslmode=require"
+        )
 
     @property
     def ALLOWED_ORIGINS_LIST(self) -> List[str]:
