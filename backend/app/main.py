@@ -84,6 +84,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
