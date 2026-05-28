@@ -9,6 +9,11 @@ const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444'
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 const ACCIONES = ['', 'login', 'logout', 'crear', 'modificar', 'eliminar', 'generar_reporte']
 
@@ -55,7 +60,7 @@ export default function AuditoriaPage() {
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+          <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
             Log de Auditoría
           </h1>
           <p className="font-mono text-[11px] mt-2 font-bold tracking-widest uppercase flex items-center gap-2" style={{ color: C.textSecondary }}>

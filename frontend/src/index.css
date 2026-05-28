@@ -3,25 +3,40 @@
 @tailwind utilities;
 
 /* =====================================================
-   TOKENS DE COLOR — Paleta JER-WEIGHT (Estilo Login)
+   TIPOGRAFÍA 
    
-   --color-primary:        #081C11 (Verde oscuro, fondos fuertes, títulos)
-   --color-accent:         #52D9A0 (Verde neón, destacar, hover)
-   --color-accent-dark:    #1B4332 (Verde bosque, bordes, elementos secundarios)
-   --color-text-sec:       #2A5C3A (Texto secundario, labels)
-   --color-bg:             #F0FBF6 (Fondo general de la app)
-   --color-white:          #FFFFFF (Tarjetas)
+   Títulos / Display : Cambria, Georgia, serif
+   Cuerpo / UI       : Arial, Helvetica, sans-serif
+   Código / Mono     : Arial, Helvetica, sans-serif
+   
+   Fuentes del sistema → sin dependencia de Google Fonts.
+===================================================== */
+
+/* =====================================================
+   TOKENS DE COLOR — Paleta 
+   
+   --color-primary:        #081C11
+   --color-accent:         #52D9A0
+   --color-accent-dark:    #1B4332
+   --color-text-sec:       #2A5C3A
+   --color-bg:             #F0FBF6
+   --color-white:          #FFFFFF
 ===================================================== */
 
 :root {
-  --color-primary: #081C11;
-  --color-accent: #52D9A0;
+  --color-primary:     #081C11;
+  --color-accent:      #52D9A0;
   --color-accent-dark: #1B4332;
-  --color-text-sec: #2A5C3A;
-  --color-bg: #F0FBF6;
-  --color-white: #FFFFFF;
-  --color-error: #C0392B;
-  --color-warning: #F5C542;
+  --color-text-sec:    #2A5C3A;
+  --color-bg:          #F0FBF6;
+  --color-white:       #FFFFFF;
+  --color-error:       #C0392B;
+  --color-warning:     #F5C542;
+
+  /* Familias tipográficas centralizadas */
+  --font-display: 'Cambria', 'Georgia', serif;
+  --font-body:    'Arial', 'Helvetica Neue', Helvetica, sans-serif;
+  --font-mono:    'Arial', 'Helvetica Neue', Helvetica, sans-serif;
 }
 
 @layer base {
@@ -30,35 +45,48 @@
   body {
     background-color: var(--color-bg);
     color: var(--color-primary);
-    font-family: 'Lora', serif;
+    font-family: var(--font-body);
+    font-size: 15px;          /* Arial se lee mejor 1px más grande que DM Sans */
+    line-height: 1.6;
     min-height: 100vh;
     overflow-x: hidden;
   }
 
-  /* Efecto de fondo sutil (Opcional, le da textura al fondo F0FBF6) */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;         /* Cambria bold — no necesita 800/900 como Syne */
+    line-height: 1.2;
+    letter-spacing: -0.01em; /* Cambria tiene mejor kern con ligero tracking negativo */
+  }
+
+  /* Efecto de fondo sutil */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 50% at 50% 0%, rgba(82, 217, 160, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 50% at 50% 0%,  rgba(82, 217, 160, 0.05) 0%, transparent 50%),
       radial-gradient(ellipse 50% 50% at 100% 100%, rgba(27, 67, 50, 0.03) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
   }
+}
 
-  h1, h2, h3 { font-family: 'Syne', sans-serif; }
+/* Sobrescribir las clases de Tailwind para que usen nuestras fuentes */
+@layer base {
+  .font-sans  { font-family: var(--font-body) !important; }
+  .font-mono  { font-family: var(--font-mono) !important; letter-spacing: 0.03em; }
 }
 
 /* =====================================================
-   COMPONENTES (Sincronizados con el Login)
+   COMPONENTES
 ===================================================== */
 @layer components {
 
-  /* CARDS — Tarjetas blancas con sombras elegantes */
+  /* CARDS */
   .card {
     background: var(--color-white);
-    border: 1px solid rgba(82, 217, 160, 0.15); /* Borde sutil del color accent */
+    border: 1px solid rgba(82, 217, 160, 0.15);
     box-shadow: 0 15px 40px rgba(8, 28, 17, 0.04);
     @apply rounded-3xl transition-all duration-300;
   }
@@ -68,7 +96,8 @@
     background: var(--color-primary);
     box-shadow: 0 10px 20px rgba(8, 28, 17, 0.15);
     color: var(--color-white);
-    @apply font-mono text-sm font-bold uppercase tracking-[0.2em] px-6 py-3.5 rounded-xl
+    font-family: var(--font-mono);
+    @apply text-sm font-bold uppercase tracking-[0.15em] px-6 py-3.5 rounded-xl
            hover:-translate-y-1 transition-all duration-200 active:scale-95 border-0 cursor-pointer
            flex items-center justify-center gap-2;
   }
@@ -85,13 +114,14 @@
     transform: none;
   }
 
-  /* BOTÓN SECUNDARIO (Para cancelar o editar) */
+  /* BOTÓN SECUNDARIO */
   .btn-secondary {
     background: transparent;
     border: 1px solid rgba(27, 67, 50, 0.2);
     color: var(--color-primary);
-    @apply font-mono text-xs uppercase font-bold tracking-[0.1em] px-5 py-3 rounded-xl
-           hover:bg-[#E2F7ED] hover:border-[var(--color-accent)] transition-all duration-200 
+    font-family: var(--font-mono);
+    @apply text-xs uppercase font-bold tracking-[0.1em] px-5 py-3 rounded-xl
+           hover:bg-[#E2F7ED] hover:border-[var(--color-accent)] transition-all duration-200
            active:scale-95 cursor-pointer flex items-center justify-center gap-2;
   }
 
@@ -100,7 +130,7 @@
     background: #F9FDFB;
     border: 1px solid rgba(27, 67, 50, 0.15);
     color: var(--color-primary);
-    font-family: sans-serif;
+    font-family: var(--font-body);
     @apply w-full px-5 py-3.5 rounded-xl text-sm transition-all duration-200 focus:outline-none;
   }
 
@@ -114,18 +144,18 @@
     color: var(--color-primary);
   }
 
-  /* LABELS DE LOS FORMULARIOS */
+  /* LABELS */
   .label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     color: var(--color-text-sec);
-    @apply block text-[0.65rem] uppercase font-bold tracking-[0.1em] mb-1.5 ml-1;
+    @apply block text-[0.68rem] uppercase font-bold tracking-[0.08em] mb-1.5 ml-1;
   }
 
-  /* TÍTULOS DE PANELES (Con línea decorativa neón) */
+  /* TÍTULOS DE PANELES */
   .panel-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     color: var(--color-primary);
-    @apply text-xs uppercase font-bold tracking-[0.15em] flex items-center gap-3 mb-6;
+    @apply text-xs uppercase font-bold tracking-[0.12em] flex items-center gap-3 mb-6;
   }
 
   .panel-title::after {
@@ -139,9 +169,9 @@
 
   /* MÉTRICAS GRANDES (Dashboard) */
   .metric-big {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     color: var(--color-primary);
-    @apply text-5xl font-black leading-none tracking-tight;
+    @apply text-5xl font-bold leading-none tracking-tight;
   }
 }
 
@@ -155,9 +185,7 @@
   border-radius: 10px;
   opacity: 0.5;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--color-accent); }
 
 /* =====================================================
    ANIMACIONES
@@ -168,4 +196,4 @@
 
 .animate-fade-in  { animation: fadeIn  0.35s ease both; }
 .animate-slide-up { animation: slideUp 0.35s ease both; }
-.scan-anim { animation: scan 1.5s ease-in-out infinite; }
+.scan-anim        { animation: scan 1.5s ease-in-out infinite; }

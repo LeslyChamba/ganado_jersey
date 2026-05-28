@@ -42,6 +42,11 @@ const C = {
   brandSub:     '#52D9A0',
   sectionLabel: '#5C8B6A',
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 export default function Layout() {
   const { usuario, logout } = useAuthStore()
@@ -88,10 +93,10 @@ export default function Layout() {
             <Scale size={18} color={C.activeText} />
           </div>
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: '15px', fontWeight: 800, color: C.brandName, letterSpacing: '0.05em', lineHeight: 1 }}>
+            <div style={{ fontFamily: F.brand, fontSize: '15px', fontWeight: 800, color: C.brandName, letterSpacing: '0.05em', lineHeight: 1 }}>
               JER-WEIGHT
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: C.brandSub, letterSpacing: '0.1em', marginTop: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+            <div style={{ fontFamily: F.body, fontSize: '9px', color: C.brandSub, letterSpacing: '0.1em', marginTop: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>
               Estimación Bovina
             </div>
           </div>
@@ -105,7 +110,7 @@ export default function Layout() {
               style={({ isActive }) => ({
                 display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '10px 14px', borderRadius: '10px', marginBottom: '4px',
-                fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', fontWeight: isActive ? 700 : 600,
+                fontFamily: F.body, fontSize: '11px', fontWeight: isActive ? 700 : 600,
                 letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none',
                 transition: 'all 0.2s ease',
                 background: isActive ? C.activeBase : 'transparent',
@@ -137,7 +142,7 @@ export default function Layout() {
             <>
               <div style={{ height: '1px', background: C.divider, margin: '20px 8px 16px 8px' }} />
               <div style={{
-                fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: C.sectionLabel,
+                fontFamily: F.body, fontSize: '9px', color: C.sectionLabel,
                 letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 800, padding: '0 14px', marginBottom: '8px',
               }}>
                 Administración
@@ -148,7 +153,7 @@ export default function Layout() {
                   style={({ isActive }) => ({
                     display: 'flex', alignItems: 'center', gap: '12px',
                     padding: '10px 14px', borderRadius: '10px', marginBottom: '4px',
-                    fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', fontWeight: isActive ? 700 : 600,
+                    fontFamily: F.body, fontSize: '11px', fontWeight: isActive ? 700 : 600,
                     letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none',
                     transition: 'all 0.2s ease',
                     background: isActive ? C.activeBase : 'transparent',
@@ -190,10 +195,10 @@ export default function Layout() {
               {usuario?.nombre?.[0]?.toUpperCase() || 'U'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '13px', fontWeight: 700, color: C.userName, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontFamily: F.body, fontSize: '13px', fontWeight: 700, color: C.userName, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {usuario?.nombre} {usuario?.apellido}
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: C.userRole, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 'bold' }}>
+              <div style={{ fontFamily: F.body, fontSize: '9px', color: C.userRole, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 'bold' }}>
                 {usuario?.rol}
               </div>
             </div>
@@ -204,7 +209,7 @@ export default function Layout() {
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               padding: '10px', borderRadius: '10px', background: 'transparent', border: '1px solid transparent',
-              cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700,
+              cursor: 'pointer', fontFamily: F.body, fontSize: '10px', fontWeight: 700,
               letterSpacing: '0.1em', textTransform: 'uppercase', color: C.logoutText, transition: 'all 0.2s',
             }}
             onMouseOver={e => { e.currentTarget.style.color = C.logoutHoverTx; e.currentTarget.style.background = C.logoutHover; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)' }}
@@ -234,7 +239,7 @@ export default function Layout() {
             <div style={{ width: '24px', height: '24px', background: C.sidebar, borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Scale size={12} color={C.activeText} />
             </div>
-            <span style={{ fontFamily: "'Syne', sans-serif", color: C.sidebar, fontWeight: 800, fontSize: '16px', letterSpacing: '0.02em' }}>
+            <span style={{ fontFamily: F.brand, color: C.sidebar, fontWeight: 800, fontSize: '16px', letterSpacing: '0.02em' }}>
               JER-WEIGHT
             </span>
           </div>

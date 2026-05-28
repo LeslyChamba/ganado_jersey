@@ -9,6 +9,11 @@ const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444'
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 // ─── Descarga un blob como archivo ────────────────────────────────────────
 function descargarBlob(blob, nombreArchivo) {
@@ -102,7 +107,7 @@ export default function ReportesPage() {
 
       {/* HEADER */}
       <div>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+        <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
           Generador de Reportes
         </h1>
         <p className="font-mono text-[11px] mt-2 font-bold tracking-widest uppercase" style={{ color: C.textSecondary }}>
@@ -118,11 +123,11 @@ export default function ReportesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           <div>
             <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Desde la fecha</label>
-            <input type="date" max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: 'JetBrains Mono' }} value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} />
+            <input type="date" max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: F.body }} value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} />
           </div>
           <div>
             <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Hasta la fecha</label>
-            <input type="date" min={fechaDesde} max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: 'JetBrains Mono' }} value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} />
+            <input type="date" min={fechaDesde} max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: F.body }} value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} />
           </div>
           <div>
             <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Ubicación / Hato</label>
@@ -160,7 +165,7 @@ export default function ReportesPage() {
               </div>
               
               <div className="flex-1 mb-6">
-                <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>
+                <h3 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>
                   {r.title}
                 </h3>
                 <p className="font-sans text-sm font-medium" style={{ color: C.textSecondary, lineHeight: 1.6 }}>

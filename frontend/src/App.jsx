@@ -13,7 +13,7 @@ import AnalisisPage  from './pages/AnalisisPage'
 import ReportesPage  from './pages/ReportesPage'
 import Guiacaptura from './pages/Guiacaptura';
 import RecuperarPassword from './components/RecuperarPassword';
-import BovinosPage from './components/admin/BovinosPage'
+import BovinosPage from './components/admin/bovinosPage'
 import RestablecerPassword from './components/RestablecerPassword';
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 1000 * 30 } }

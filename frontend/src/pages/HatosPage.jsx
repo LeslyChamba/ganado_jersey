@@ -9,6 +9,11 @@ const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444'
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 export default function HatosPage() {
   const qc = useQueryClient()
@@ -90,7 +95,7 @@ export default function HatosPage() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2rem', fontWeight: 800 }}>
+          <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2rem', fontWeight: 800 }}>
             Hatos y Propiedades
           </h1>
           <p className="font-mono text-xs mt-1 font-bold tracking-widest uppercase" style={{ color: C.textSecondary }}>
@@ -115,7 +120,7 @@ export default function HatosPage() {
           <div className="w-20 h-20 bg-[#E8F8F1] rounded-full flex items-center justify-center mb-4">
             <Home size={32} style={{ color: C.accentDark }} />
           </div>
-          <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
+          <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
             Ningún hato registrado
           </h2>
           <p className="mt-2 text-sm max-w-md" style={{ color: C.textSecondary }}>
@@ -165,7 +170,7 @@ export default function HatosPage() {
               </div>
 
               <div className="flex-1">
-                <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800, lineHeight: 1.2 }}>
+                <h3 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.4rem', fontWeight: 800, lineHeight: 1.2 }}>
                   {h.nombre}
                 </h3>
                 <p className="font-mono text-xs mt-1.5 font-bold uppercase tracking-wider" style={{ color: C.accentDark }}>
@@ -202,7 +207,7 @@ export default function HatosPage() {
             
             <div className="px-8 py-6 flex items-center justify-between" style={{ background: '#F9FDFB', borderBottom: '1px solid rgba(82, 217, 160, 0.2)' }}>
               <div>
-                <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
+                <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
                   {editando ? 'Editar Hato' : 'Registrar Hato'}
                 </h2>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: C.textSecondary }}>

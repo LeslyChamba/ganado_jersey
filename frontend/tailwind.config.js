@@ -4,9 +4,11 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['Syne', 'sans-serif'],
-        body:    ['Lora', 'serif'],
-        mono:    ['JetBrains Mono', 'monospace'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Si quieres asegurar tu fuente monoespaciada:
+        mono: ['JetBrains Mono', 'monospace'],
+        // Puedes crear una clase para tus títulos y borrar el style={{fontFamily: 'Syne'}} de tu JSX
+        syne: ['Syne', 'sans-serif']
       },
       colors: {
         earth:  '#2C1810',

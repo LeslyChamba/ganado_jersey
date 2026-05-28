@@ -12,6 +12,11 @@ const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444', warning: '#F59E0B'
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 const ROL_BADGE = {
   admin:    { bg: '#E8F8F1', text: C.accentDark, label: 'Administrador' },
@@ -131,7 +136,7 @@ export default function AdminPage() {
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+          <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
             Gestión de Usuarios
           </h1>
           <p className="font-mono text-[11px] mt-2 font-bold tracking-widest uppercase" style={{ color: C.textSecondary }}>
@@ -158,7 +163,7 @@ export default function AdminPage() {
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner mb-4" style={{ background: s.bg }}>
               <s.icon size={20} style={{ color: s.color }} />
             </div>
-            <div style={{ fontFamily: 'Syne, sans-serif', color: s.color, fontSize: '2rem', fontWeight: 800, lineHeight: 1 }}>{s.valor}</div>
+            <div style={{ fontFamily: F.brand, color: s.color, fontSize: '2rem', fontWeight: 800, lineHeight: 1 }}>{s.valor}</div>
             <div className="font-mono text-[10px] mt-2 font-bold uppercase tracking-wider" style={{ color: C.textSecondary }}>{s.label}</div>
           </div>
         ))}
@@ -240,7 +245,7 @@ export default function AdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(8,28,17,0.6)] backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-sm bg-white rounded-[2rem] p-8 text-center shadow-2xl animate-in zoom-in-95">
             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={28} /></div>
-            <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800, marginBottom: '8px' }}>¿Eliminar usuario?</h2>
+            <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.5rem', fontWeight: 800, marginBottom: '8px' }}>¿Eliminar usuario?</h2>
             <p className="font-mono text-sm mb-6" style={{ color: C.primary }}>
               Se eliminará a <strong style={{ color: C.danger }}>{confirmEliminar.nombre} {confirmEliminar.apellido}</strong>. Esta acción no se puede deshacer.
             </p>

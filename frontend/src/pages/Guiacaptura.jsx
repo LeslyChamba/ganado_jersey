@@ -35,10 +35,10 @@ function SiluetaLateral({ size = 130 }) {
       <line x1="235" y1="128" x2="65" y2="128" stroke="#3D6B9E" strokeWidth="1.8"/>
       <circle cx="235" cy="128" r="2.5" fill="#3D6B9E"/>
       <circle cx="65"  cy="128" r="2.5" fill="#3D6B9E"/>
-      <text x="150" y="140" textAnchor="middle" fill="#3D6B9E" fontSize="9" fontFamily="monospace" fontWeight="700">LC</text>
+      <text x="150" y="140" textAnchor="middle" fill="#3D6B9E" fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">LC</text>
       <line x1="190" y1="46" x2="190" y2="146" stroke="#C0392B" strokeWidth="1.8" strokeDasharray="4,2"/>
-      <text x="197" y="93" fill="#C0392B" fontSize="9" fontFamily="monospace" fontWeight="700">PT</text>
-      <text x="50" y="20" fill={C.accent} fontSize="9" fontFamily="monospace" fontWeight="700">2 – 4 m →</text>
+      <text x="197" y="93" fill="#C0392B" fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">PT</text>
+      <text x="50" y="20" fill={C.accent} fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">2 – 4 m →</text>
     </svg>
   )
 }
@@ -61,8 +61,8 @@ function SiluetaTrasera({ size = 100 }) {
         stroke="#8B5CF6" strokeWidth="1.8"/>
       <circle cx="35"  cy="115" r="3" fill="#8B5CF6"/>
       <circle cx="165" cy="115" r="3" fill="#8B5CF6"/>
-      <text x="100" y="108" textAnchor="middle" fill="#8B5CF6" fontSize="9" fontFamily="monospace" fontWeight="700">AC</text>
-      <text x="100" y="185" textAnchor="middle" fill={C.accent} fontSize="9" fontFamily="monospace" fontWeight="700">cola centrada</text>
+      <text x="100" y="108" textAnchor="middle" fill="#8B5CF6" fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">AC</text>
+      <text x="100" y="185" textAnchor="middle" fill={C.accent} fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">cola centrada</text>
     </svg>
   )
 }

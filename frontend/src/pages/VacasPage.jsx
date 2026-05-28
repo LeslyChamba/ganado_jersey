@@ -14,6 +14,11 @@ const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444'
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 export default function VacasPage() {
   const qc = useQueryClient()
@@ -94,7 +99,7 @@ export default function VacasPage() {
       {/* CABECERA */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2rem', fontWeight: 800 }}>
+          <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2rem', fontWeight: 800 }}>
             Ganado Jersey
           </h1>
           <p className="font-mono text-xs mt-1 font-bold tracking-widest uppercase" style={{ color: C.textSecondary }}>
@@ -131,7 +136,7 @@ export default function VacasPage() {
           <div className="w-20 h-20 bg-[#E8F8F1] rounded-full flex items-center justify-center mb-4">
             <Activity size={32} style={{ color: C.accentDark }} />
           </div>
-          <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
+          <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
             Sin vacas registradas
           </h2>
           <p className="mt-2 text-sm max-w-md" style={{ color: C.textSecondary }}>
@@ -211,7 +216,7 @@ export default function VacasPage() {
           <div className="w-full max-w-lg bg-white rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-8 py-6 flex items-center justify-between" style={{ background: '#F9FDFB', borderBottom: '1px solid rgba(82, 217, 160, 0.2)' }}>
               <div>
-                <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
+                <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
                   Nueva vaca Jersey
                 </h2>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: C.textSecondary }}>
@@ -275,7 +280,7 @@ export default function VacasPage() {
             {/* Header del Historial */}
             <div className="flex items-center justify-between px-8 py-6" style={{ background: C.primary }}>
               <div>
-                <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.white, fontSize: '1.8rem', fontWeight: 800 }}>
+                <h2 style={{ fontFamily: F.brand, color: C.white, fontSize: '1.8rem', fontWeight: 800 }}>
                   {historialVaca.nombre || `Vaca ${historialVaca.arete}`}
                 </h2>
                 <div className="flex items-center gap-4 mt-2">
@@ -315,12 +320,12 @@ export default function VacasPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(27,67,50,0.08)" vertical={false} />
-                      <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: C.textSecondary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
-                      <YAxis yAxisId="peso" tick={{ fontSize: 11, fill: C.primary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} domain={['auto', 'auto']} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="bcs" orientation="right" tick={{ fontSize: 11, fill: C.accentDark, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: C.textSecondary, fontFamily: F.body, fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
+                      <YAxis yAxisId="peso" tick={{ fontSize: 11, fill: C.primary, fontFamily: F.body, fontWeight: 'bold' }} domain={['auto', 'auto']} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="bcs" orientation="right" tick={{ fontSize: 11, fill: C.accentDark, fontFamily: F.body, fontWeight: 'bold' }} domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} axisLine={false} tickLine={false} />
                       
-                      <Tooltip contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: 'JetBrains Mono', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }} itemStyle={{ color: 'white' }} formatter={(v, name) => [name === 'peso' ? `${v} kg` : v, name === 'peso' ? 'Peso' : 'BCS']} />
-                      <Legend formatter={v => <span style={{ color: C.primary, fontWeight: 'bold', fontSize: 11, fontFamily: 'JetBrains Mono', textTransform: 'uppercase' }}>{v === 'peso' ? 'Peso (kg)' : 'BCS'}</span>} iconType="circle" wrapperStyle={{ paddingTop: '20px' }}/>
+                      <Tooltip contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: F.body, boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }} itemStyle={{ color: 'white' }} formatter={(v, name) => [name === 'peso' ? `${v} kg` : v, name === 'peso' ? 'Peso' : 'BCS']} />
+                      <Legend formatter={v => <span style={{ color: C.primary, fontWeight: 'bold', fontSize: 11, fontFamily: F.body, textTransform: 'uppercase' }}>{v === 'peso' ? 'Peso (kg)' : 'BCS'}</span>} iconType="circle" wrapperStyle={{ paddingTop: '20px' }}/>
                       
                       {/* Curvas suaves usando type="monotone" */}
                       <Area yAxisId="peso" type="monotone" dataKey="peso" stroke={C.primary} strokeWidth={4} fillOpacity={1} fill="url(#colorPeso)" dot={{ r: 4, fill: C.white, stroke: C.primary, strokeWidth: 2 }} activeDot={{ r: 6, fill: C.accent }} />
@@ -368,7 +373,7 @@ export default function VacasPage() {
          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(8,28,17,0.6)] backdrop-blur-sm animate-in fade-in">
            <div className="w-full max-w-sm bg-white rounded-[2rem] p-8 text-center shadow-2xl animate-in zoom-in-95">
              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={24} /></div>
-             <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800, marginBottom: '8px' }}>¿Eliminar vaca?</h2>
+             <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.5rem', fontWeight: 800, marginBottom: '8px' }}>¿Eliminar vaca?</h2>
              <p className="font-mono text-sm opacity-80 mb-8" style={{ color: C.primary }}>Se eliminará <strong>{confirmarEliminar.nombre || confirmarEliminar.arete}</strong> y sus análisis. Irreversible.</p>
              <div className="flex gap-3">
                <button onClick={() => setConfirmarEliminar(null)} className="flex-1 py-3 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-colors hover:bg-gray-100" style={{ color: C.primary, border: '1px solid #E5E7EB' }}>Cancelar</button>

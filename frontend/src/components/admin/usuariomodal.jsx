@@ -93,11 +93,11 @@ export default function UsuarioModal({ abierto, usuario, onGuardar, onCerrar }) 
       {/* Panel */}
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
         {/* Cabecera */}
-        <div className="bg-gradient-to-r from-emerald-700 to-emerald-500 px-6 py-5">
-          <h2 className="text-white font-bold text-xl tracking-tight">
+        <div className="px-6 py-5" style={{ background: '#F9FDFB', borderBottom: '1px solid rgba(82,217,160,0.2)' }}>
+          <h2 className="font-bold text-xl" style={{ fontFamily: "Cambria, 'Times New Roman', serif", color: '#081C11' }}>
             {esEdicion ? "Editar usuario" : "Nuevo usuario"}
           </h2>
-          <p className="text-emerald-100 text-sm mt-0.5">
+          <p className="text-sm mt-0.5" style={{ fontFamily: "Arial, Helvetica, sans-serif", color: '#2A5C3A' }}>
             {esEdicion
               ? "Modifica los datos básicos del usuario"
               : "Completa el formulario para crear la cuenta"}
@@ -133,7 +133,7 @@ export default function UsuarioModal({ abierto, usuario, onGuardar, onCerrar }) 
           {/* Rol — solo al crear */}
           {!esEdicion && (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-semibold mb-1.5" style={{ fontFamily: "Arial, Helvetica, sans-serif", color: '#2A5C3A' }}>
                 Rol
               </label>
               <select
@@ -165,17 +165,16 @@ export default function UsuarioModal({ abierto, usuario, onGuardar, onCerrar }) 
             <button
               type="button"
               onClick={onCerrar}
-              className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm
-                         font-semibold text-gray-600 hover:bg-gray-50 transition"
+              className="flex-1 border rounded-xl py-2.5 text-sm font-semibold transition hover:bg-gray-50"
+              style={{ fontFamily: "Arial, Helvetica, sans-serif", color: '#081C11', borderColor: '#E5E7EB' }}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={cargando}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white
-                         rounded-xl py-2.5 text-sm font-semibold transition
-                         disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl py-2.5 text-sm font-semibold transition text-white disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ fontFamily: "Arial, Helvetica, sans-serif", background: '#081C11' }}
             >
               {cargando ? "Guardando…" : esEdicion ? "Guardar cambios" : "Crear usuario"}
             </button>
@@ -190,7 +189,7 @@ export default function UsuarioModal({ abierto, usuario, onGuardar, onCerrar }) 
 function Campo({ label, name, value, onChange, error, type = "text", placeholder }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+      <label className="block text-sm font-semibold mb-1.5" style={{ fontFamily: "Arial, Helvetica, sans-serif", color: '#2A5C3A' }}>
         {label}
       </label>
       <input

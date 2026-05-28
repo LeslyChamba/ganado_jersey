@@ -21,10 +21,15 @@ const C = {
   warning: '#F5C542', warningBg: '#FFFBEB', warningBorder: '#FDE68A',
   error: '#C0392B', errorBg: '#FEF2F2',
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 // ─── Umbrales de confianza ────────────────────────────────────────────────
 const BCS_CONFIDENCE_THRESHOLD  = 70
-const PESO_CONFIDENCE_THRESHOLD = 65
+const PESO_CONFIDENCE_THRESHOLD = 45
 
 const STEPS = [
   'Cargando imágenes al servidor seguro',
@@ -120,7 +125,7 @@ function ModalOpciones({ open, onClose, onCamara, onGaleria }) {
         {/* Botón: Cámara */}
         <button
           type="button"
-          onClick={() => { onCamara(); onClose() }}
+          onClick={() => { onClose(); setTimeout(onCamara, 80) }}   
           className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all active:scale-95"
           style={{ background: C.primary, color: '#FFFFFF' }}
         >
@@ -215,7 +220,7 @@ function ComparadorPesoReal({ pesoEstimado }) {
           <Ruler size={20} style={{ color: C.accentDark }} />
         </div>
         <div>
-          <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.3rem', fontWeight: 800 }}>
+          <h3 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.3rem', fontWeight: 800 }}>
             Verificar con Peso Real
           </h3>
           <p className="font-mono text-[10px] mt-0.5 uppercase tracking-wider" style={{ color: C.textSecondary }}>
@@ -268,7 +273,7 @@ function ComparadorPesoReal({ pesoEstimado }) {
               <div className="font-mono text-[9px] uppercase tracking-widest mb-1" style={{ color: C.accent }}>
                 IA Estimó
               </div>
-              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '2.8rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
+              <div style={{ fontFamily: F.brand, fontSize: '2.8rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
                 {pesoEstimado.toFixed(0)}
                 <span className="font-mono text-lg" style={{ color: C.accent }}> kg</span>
               </div>
@@ -278,7 +283,7 @@ function ComparadorPesoReal({ pesoEstimado }) {
               <div className="font-mono text-[9px] uppercase tracking-widest mb-1" style={{ color: C.textSub }}>
                 Peso Real
               </div>
-              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '2.8rem', fontWeight: 900, color: C.primary, lineHeight: 1 }}>
+              <div style={{ fontFamily: F.brand, fontSize: '2.8rem', fontWeight: 900, color: C.primary, lineHeight: 1 }}>
                 {comparado.real.toFixed(0)}
                 <span className="font-mono text-lg" style={{ color: C.textSub }}> kg</span>
               </div>
@@ -478,7 +483,7 @@ const SiluetaLateral = ({ ok }) => {
         fill={ok ? C.primary : 'rgba(255,255,255,0.85)'}/>
       <text x="160" y="25" textAnchor="middle"
         fill={ok ? C.accent : C.textSub}
-        fontSize="9" fontFamily="JetBrains Mono, monospace" fontWeight="700" letterSpacing="0.06em">
+        fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700" letterSpacing="0.06em">
         {ok ? '✓ ALINEACIÓN CORRECTA' : 'AJUSTE LA VACA AL CONTORNO'}
       </text>
     </svg>
@@ -879,7 +884,7 @@ export default function AnalisisPage() {
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6"
         style={{ borderColor: 'rgba(27,67,50,0.1)' }}>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+        <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
           Nueva Estimación AI
         </h1>
         {resultado && (
@@ -902,7 +907,7 @@ export default function AnalisisPage() {
                 <CheckCircle2 size={24} style={{ color: C.accentDark }} />
               </div>
               <div className="flex-1">
-                <div style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
+                <div style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.5rem', fontWeight: 800 }}>
                   Reporte Finalizado
                 </div>
                 <div className="font-mono text-[11px] mt-1 uppercase tracking-wider" style={{ color: C.textSecondary }}>
@@ -922,7 +927,7 @@ export default function AnalisisPage() {
                 style={{ background: C.primary, boxShadow: '0 10px 30px rgba(8,28,17,0.15)' }}>
                 <div className="font-mono text-[10px] uppercase tracking-widest mb-2"
                   style={{ color: C.accent, fontWeight: 700 }}>Peso Corporal Estimado</div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '4.5rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
+                <div style={{ fontFamily: F.brand, fontSize: '4.5rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
                   {resultado.peso_estimado_kg?.toFixed(0)}
                   <span style={{ fontSize: '2rem', color: C.accent, fontWeight: 700, marginLeft: '4px' }}>kg</span>
                 </div>
@@ -948,7 +953,7 @@ export default function AnalisisPage() {
               <div className="rounded-[1.5rem] p-8 text-center" style={{ background: bcsBgColor }}>
                 <div className="font-mono text-[10px] uppercase tracking-widest mb-2"
                   style={{ color: bcsTextColor, fontWeight: 700 }}>Condición Corporal (BCS)</div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '4.5rem', fontWeight: 900, color: bcsTextColor, lineHeight: 1 }}>
+                <div style={{ fontFamily: F.brand, fontSize: '4.5rem', fontWeight: 900, color: bcsTextColor, lineHeight: 1 }}>
                   {resultado.bcs?.toFixed(1)}
                 </div>
                 <div className="inline-block mt-3 px-4 py-1.5 rounded-lg font-mono text-[10px] font-bold shadow-sm"
@@ -1021,7 +1026,7 @@ export default function AnalisisPage() {
             <div className="bg-white p-8 shadow-sm border border-emerald-50 rounded-[2rem]">
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
                 <Scale size={20} style={{ color: C.accentDark }} />
-                <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
+                <h3 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
                   Análisis Morfométrico
                 </h3>
               </div>
@@ -1037,7 +1042,7 @@ export default function AnalisisPage() {
                   <div key={label} className="rounded-xl p-5 bg-[#F9FDFB] border border-[rgba(27,67,50,0.1)]">
                     <div className="font-mono text-[10px] mb-1 uppercase tracking-widest font-bold"
                       style={{ color: C.textSecondary }}>{label}</div>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.6rem', fontWeight: 800, color: C.primary, lineHeight: 1 }}>
+                    <div style={{ fontFamily: F.brand, fontSize: '1.6rem', fontWeight: 800, color: C.primary, lineHeight: 1 }}>
                       {val.toFixed(1)} <span className="font-mono text-xs" style={{ color: C.textSecondary }}>cm</span>
                     </div>
                   </div>
@@ -1095,7 +1100,7 @@ export default function AnalisisPage() {
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[11px] font-bold"
                     style={{ background: '#E8F8F1', color: C.accentDark }}>1</div>
-                  <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
+                  <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
                     Identificación Bovina
                   </h2>
                 </div>
@@ -1108,7 +1113,7 @@ export default function AnalisisPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[11px] font-bold"
                       style={{ background: '#E8F8F1', color: C.accentDark }}>2</div>
-                    <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
+                    <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
                       Adquisición de Imágenes
                     </h2>
                   </div>
@@ -1175,7 +1180,7 @@ export default function AnalisisPage() {
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[11px] font-bold"
                     style={{ background: '#E8F8F1', color: C.accentDark }}>3</div>
-                  <h2 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
+                  <h2 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.4rem', fontWeight: 800 }}>
                     Contexto de Campo (Opcional)
                   </h2>
                 </div>

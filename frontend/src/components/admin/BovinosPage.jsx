@@ -1,24 +1,22 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell
 } from 'recharts'
 import { Beef, Scale, AlertTriangle, TrendingUp, Search, X, Database } from 'lucide-react'
 import { getBCSColor, formatFechaHora } from '../../services/helpers'
-
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL })
-api.interceptors.request.use(cfg => {
-  const token = JSON.parse(localStorage.getItem('auth-store') || '{}')?.state?.token
-  if (token) cfg.headers.Authorization = `Bearer ${token}`
-  return cfg
-})
+import api from '../../services/api'
 
 /* ── Tokens de color de la marca JER-WEIGHT ── */
 const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444', warning: '#F59E0B'
+}
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
 }
 
 export default function AdminBovinosPage() {
@@ -30,7 +28,7 @@ export default function AdminBovinosPage() {
   // Stats generales
   const { data: stats } = useQuery({
     queryKey: ['admin-bovinos-stats'],
-    queryFn: () => api.get('/api/v1/admin/bovinos/stats').then(r => r.data),
+    queryFn: () => api.get('/admin/bovinos/stats').then(r => r.data),
   })
 
   // Lista con filtros
@@ -40,7 +38,7 @@ export default function AdminBovinosPage() {
       const params = new URLSearchParams()
       if (filtrosActivos.min) params.append('peso_min', filtrosActivos.min)
       if (filtrosActivos.max) params.append('peso_max', filtrosActivos.max)
-      return api.get(`/api/v1/admin/bovinos?${params}`).then(r => r.data)
+      return api.get(`/admin/bovinos?${params}`).then(r => r.data)
     },
   })
 
@@ -61,12 +59,12 @@ export default function AdminBovinosPage() {
 
   // Datos para gráfica de distribución de peso
   const rangos = [
-    { label: '<200', min: 0,   max: 200  },
-    { label: '200-250', min: 200, max: 250 },
-    { label: '250-300', min: 250, max: 300 },
-    { label: '300-350', min: 300, max: 350 },
-    { label: '350-400', min: 350, max: 400 },
-    { label: '>400',  min: 400, max: 9999 },
+    { label: '<200',    min: 0,   max: 200  },
+    { label: '200-250', min: 200, max: 250  },
+    { label: '250-300', min: 250, max: 300  },
+    { label: '300-350', min: 300, max: 350  },
+    { label: '350-400', min: 350, max: 400  },
+    { label: '>400',    min: 400, max: 9999 },
   ]
   const distPeso = rangos.map(r => ({
     label: r.label,
@@ -95,7 +93,7 @@ export default function AdminBovinosPage() {
 
       {/* ── HEADER ── */}
       <div>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+        <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
           Supervisión de Bovinos
         </h1>
         <p className="font-mono text-[11px] mt-2 font-bold tracking-widest uppercase" style={{ color: C.textSecondary }}>
@@ -111,7 +109,7 @@ export default function AdminBovinosPage() {
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner mb-4" style={{ background: bg }}>
               <Icon size={20} style={{ color: accent }} />
             </div>
-            <div style={{ fontFamily: 'Syne, sans-serif', color: accent, fontSize: '2rem', fontWeight: 800, lineHeight: 1 }}>
+            <div style={{ fontFamily: F.brand, color: accent, fontSize: '2rem', fontWeight: 800, lineHeight: 1 }}>
               {value}
             </div>
             <div className="font-mono text-[10px] mt-2 font-bold uppercase tracking-wider" style={{ color: C.textSecondary }}>{label}</div>
@@ -135,10 +133,10 @@ export default function AdminBovinosPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(27,67,50,0.08)" vertical={false} />
-                <XAxis dataKey="arete" tick={{ fontSize: 10, fill: C.textSecondary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
-                <YAxis tick={{ fontSize: 10, fill: C.primary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: 'JetBrains Mono', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}
+                <XAxis dataKey="arete" tick={{ fontSize: 10, fill: C.textSecondary, fontFamily: F.body, fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
+                <YAxis tick={{ fontSize: 10, fill: C.primary, fontFamily: F.body, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: F.body, boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}
                   itemStyle={{ color: 'white', fontWeight: 'bold' }}
                   formatter={v => [`${v} kg`, 'Peso']}
                 />
@@ -154,11 +152,11 @@ export default function AdminBovinosPage() {
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={distPeso} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(27,67,50,0.08)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.textSecondary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
-              <YAxis tick={{ fontSize: 10, fill: C.primary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} allowDecimals={false} axisLine={false} tickLine={false} />
-              <Tooltip 
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.textSecondary, fontFamily: F.body, fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
+              <YAxis tick={{ fontSize: 10, fill: C.primary, fontFamily: F.body, fontWeight: 'bold' }} allowDecimals={false} axisLine={false} tickLine={false} />
+              <Tooltip
                 cursor={{ fill: 'rgba(82,217,160,0.1)' }}
-                contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: 'JetBrains Mono', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}
+                contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: F.body, boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}
                 itemStyle={{ color: 'white', fontWeight: 'bold' }}
                 formatter={v => [v, 'Bovinos']}
               />
@@ -233,7 +231,7 @@ export default function AdminBovinosPage() {
                   <span key={h} className="font-mono text-[10px] uppercase font-bold tracking-widest" style={{ color: C.textSecondary }}>{h}</span>
                 ))}
               </div>
-              
+
               {/* Filas */}
               <ul className="divide-y divide-[rgba(8,28,17,0.03)]">
                 {bovinosFiltrados.map((b) => {

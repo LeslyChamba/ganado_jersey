@@ -12,6 +12,11 @@ const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444', warning: '#F5C542'
 }
+/* ── Tokens de tipografía ── */
+const F = {
+  brand: "Cambria, 'Times New Roman', serif",
+  body:  "Arial, Helvetica, sans-serif",
+}
 
 export default function DashboardPage() {
   const { usuario } = useAuthStore()
@@ -78,7 +83,7 @@ export default function DashboardPage() {
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+          <h1 style={{ fontFamily: F.brand, color: C.primary, fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
             {isAdmin ? 'Panel de Control' : 'Mi Ganadería'}
           </h1>
           <p className="font-mono text-xs mt-2 font-bold tracking-widest uppercase" style={{ color: C.textSecondary }}>
@@ -108,7 +113,7 @@ export default function DashboardPage() {
                 </span>
               )}
             </div>
-            <div style={{ fontFamily: 'Syne, sans-serif', color: accent, fontSize: '2.5rem', fontWeight: 800, lineHeight: 1 }}>
+            <div style={{ fontFamily: F.brand, color: accent, fontSize: '2.5rem', fontWeight: 800, lineHeight: 1 }}>
               {value}
             </div>
             <div className="font-mono text-xs mt-2 font-bold uppercase tracking-wider" style={{ color: C.textSecondary }}>
@@ -134,10 +139,10 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(27,67,50,0.08)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: C.textSecondary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
-                <YAxis tick={{ fontSize: 10, fill: C.primary, fontFamily: 'JetBrains Mono', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: C.textSecondary, fontFamily: F.body, fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
+                <YAxis tick={{ fontSize: 10, fill: C.primary, fontFamily: F.body, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                 <Tooltip 
-                  contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: 'JetBrains Mono', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}
+                  contentStyle={{ background: C.primary, border: 'none', borderRadius: 12, color: 'white', fontSize: 12, fontFamily: F.body, boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}
                   itemStyle={{ color: 'white', fontWeight: 'bold' }}
                   formatter={v => [`${v} kg`, 'Peso Estimado']}
                 />
@@ -150,12 +155,12 @@ export default function DashboardPage() {
         {/* Gráfica de Anillo (BCS) */}
         {(bcsData[0].value > 0 || bcsData[1].value > 0) && (
           <div className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-emerald-50 flex flex-col items-center justify-center">
-            <h3 className="font-mono text-sm font-bold uppercase tracking-widest mb-2 w-full text-center" style={{ color: C.primary }}>Salud del Rebaño (BCS)</h3>
+            <h3 className="font-mono text-sm font-bold uppercase tracking-widest mb-2 w-full text-center" style={{ color: C.primary }}>Salud de las vacas (BCS)</h3>
             <PieChart width={200} height={200}>
               <Pie data={bcsData} cx={100} cy={100} innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value" stroke="none">
                 {bcsData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
-              <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} itemStyle={{ fontWeight: 'bold', fontFamily: 'JetBrains Mono' }} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} itemStyle={{ fontWeight: 'bold', fontFamily: F.body }} />
             </PieChart>
             <div className="w-full space-y-2 mt-2">
               {bcsData.map(d => (
@@ -215,7 +220,7 @@ export default function DashboardPage() {
           <div className="w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="px-8 py-6 flex items-center justify-between" style={{ background: '#FEF2F2', borderBottom: '1px solid rgba(239, 68, 68, 0.2)' }}>
               <div>
-                <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '1.5rem', color: C.danger }} className="flex items-center gap-2">
+                <h2 style={{ fontFamily: F.brand, fontWeight: 800, fontSize: '1.5rem', color: C.danger }} className="flex items-center gap-2">
                   <AlertTriangle size={24} /> Animales en Alerta
                 </h2>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: '#991B1B' }}>
@@ -231,7 +236,7 @@ export default function DashboardPage() {
                   <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
                      <span className="text-2xl">🌿</span>
                   </div>
-                  <h3 style={{ fontFamily: 'Syne, sans-serif', color: C.primary, fontSize: '1.2rem', fontWeight: 800 }}>Todo en orden</h3>
+                  <h3 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.2rem', fontWeight: 800 }}>Todo en orden</h3>
                   <p className="font-mono text-xs mt-2" style={{ color: C.textSecondary }}>No hay animales que requieran atención inmediata.</p>
                 </div>
               ) : (
