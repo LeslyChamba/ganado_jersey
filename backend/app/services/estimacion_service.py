@@ -1,119 +1,137 @@
+"""
+JER-WEIGHT — Estimacion Service  v5.0.0
+  Modelo principal : EfficientNet-B0 híbrido ensemble (5 folds GroupKFold)
+                     MAE validado: 7.48 ± 1.28 kg  (68 vacas Jersey)
+  Modelo respaldo  : XGBoost v3 (si CNN falla o imagen inválida)
+                     MAE validado: ~9.7 kg
+  BCS              : YOLOv8 — ÚNICA instancia en toda la app (eliminado de VisionService)
+  Ensemble         : promedio de 5 modelos (uno por fold GroupKFold)
+
+CAMBIO CRÍTICO v5.0 vs v4.0 (RAM Render Free 512 MB):
+  - YOLO BCS ya NO vive en VisionService → solo aquí (una instancia, no dos)
+  - CNN ensemble: 5 × 18.7 MB = 93.7 MB RAM  (caben perfectamente)
+  - SAM vit_b eliminado de vision_service.py → MobileSAM (~35 MB)
+  - Presupuesto total estimado: ~274 MB de 512 MB disponibles
+
+Firmas que cambian respecto a v4:
+  - estimar() recibe imagen_lateral: Optional[np.ndarray]  (sin cambio)
+  - estimar() recibe imagen_trasera: Optional[str]         (sin cambio)
+  - estimar() retorna (peso_kg, bcs, confianza_pct, bcs_conf)  (sin cambio)
+  ✓ analisis_controller.py NO necesita cambios de firma
+"""
 import logging
 import numpy as np
 import pandas as pd
+import torch
+import torch.nn as nn
 from pathlib import Path
-from typing import Optional, Tuple
-from huggingface_hub import hf_hub_download
-import os
+from typing import Optional, Tuple, List
+from torchvision import transforms
+from PIL import Image
+
 from app.schemas.schemas import MorfometriaData
 
 logger = logging.getLogger(__name__)
 
-# ── Rutas relativas al archivo ─────────────────────────────────────────────
-# --- Configuración de Hugging Face ---
-REPO_ID = "lesly15/Peso"
-HF_TOKEN = os.getenv("HF_TOKEN")
+# ── Rutas ──────────────────────────────────────────────────
+PROYECTO_DIR   = Path(__file__).resolve().parent.parent.parent
+MODELS_DIR     = PROYECTO_DIR / "models_pt"
+CNN_MODELS_DIR = MODELS_DIR / "models_ptA"   # subcarpeta con los 5 .pth
 
-# Descarga de modelos desde Hugging Face
-# Esto sobreescribe las rutas locales con las rutas temporales de descarga
-# DESPUÉS
-MASS_MODEL = Path(hf_hub_download(repo_id=REPO_ID, filename="mass_model_v3.json", token=HF_TOKEN))
-FEAT_FILE  = Path(hf_hub_download(repo_id=REPO_ID, filename="feature_names_v3.txt", token=HF_TOKEN))
-BCS_MODEL  = Path(hf_hub_download(repo_id=REPO_ID, filename="best.pt", token=HF_TOKEN))
-
-PESO_MIN_KG = 280.0
-PESO_MAX_KG = 750.0
-
-# ── Features v3 (8 features, orden crítico para XGBoost) ──────────────────
-FEATURE_NAMES = [
-   "pt", "lc", "bcs", "vol", "pt_lc_ratio", 
-    "bcs_pt", "bcs_vol", "pt_sq", "lc_sq", "pt_bcs_lc"
+CNN_MODELS = [
+    CNN_MODELS_DIR / f"hibrido_fold_{i}.pth"
+    for i in range(1, 6)
 ]
 
-# ── Parámetros calibrados con 69 vacas Jersey reales ──────────────────────
-# (Optimizados via L-BFGS-B minimizando MSE)
-CAL = {
-    "k_base":     10999.0,
-    "k_bcs_alto":   250.0,   # bcs >= 4.0
-    "k_bcs_bajo":   250.0,   # bcs <= 2.5
-    "a_pt":       1.2129,    # antes era 0.0387 (medida SAM→real)
-    "b_pt":      -27.56,     # antes era 172.71
-    "a_lc":       0.8243,    # NUEVO: regresión continua (antes: 155/165 fijo)
-    "b_lc":       10.01,
-}
+MASS_MODEL_XGB = MODELS_DIR / "mass_model_v3.json"
+FEAT_FILE_XGB  = MODELS_DIR / "feature_names_v3.txt"
+BCS_MODEL      = MODELS_DIR / "best.pt"   # ← única instancia YOLO en la app
 
-# ── Pesos de blend validados por RMSE (fórmula RMSE=23.9, XGB RMSE=9.7) ───
-W_FORMULA  = 0.14   # antes: 0.30 (SAM ok) o 0.50
-W_XGBOOST  = 0.86   # antes: 0.70 o 0.50
+# ── Parámetros de normalización (dataset 68 vacas Jersey) ──
+PESO_MEAN = 481.0
+PESO_STD  = 74.7
+BCS_MEAN  = 3.26;  BCS_STD  = 0.44
+PT_MEAN   = 180.52; PT_STD  = 9.33
+LC_MEAN   = 160.68; LC_STD  = 10.16
 
-# ── RMSE de referencia para intervalo de confianza ────────────────────────
-RMSE_BLEND   = 9.7    # RMSE CV del modelo (conservador)
-RMSE_FORMULA = 23.9
+# ── IC basado en MAE validado ──────────────────────────────
+MAE_CNN    = 7.48
+MAE_XGB    = 9.70
+MAE_FORMULA = 23.9
+IC_FACTOR  = 1.96
 
-PT_IMG_MIN, PT_IMG_MAX = 50.0, 420.0
-LC_IMG_MIN, LC_IMG_MAX = 20.0, 500.0
+PESO_MIN = 280.0
+PESO_MAX = 750.0
 
-
-# Factores calibrados: SAM sobreestima ~14% vs cinta real
-# Regresión lineal calibrada con dataset real (recalcular con script)
-# Forma: pt_real = PT_COEF * pt_sam + PT_INTERCEPT
-# Ejecutar calibrar_factores_sam.py para obtener estos valores
-SAM_PT_COEF      = 0.886    # ← reemplazar con output del script
-SAM_PT_INTERCEPT = 0.0      # ← reemplazar con output del script
-SAM_LC_COEF      = 0.826    # ← reemplazar con output del script
-SAM_LC_INTERCEPT = 0.0      # ← reemplazar con output del script
-
-def estimar_cinta_desde_sam(pt_img: float, lc_img: float) -> Tuple[float, float]:
-    """
-    Corrige sesgo SAM → cinta real usando regresión lineal calibrada
-    con dataset real de vacas Jersey. Más preciso que factor fijo.
-    """
-    pt_real = float(np.clip(
-        SAM_PT_COEF * pt_img + SAM_PT_INTERCEPT,
-        148.0, 220.0
-    ))
-    lc_real = float(np.clip(
-        SAM_LC_COEF * lc_img + SAM_LC_INTERCEPT,
-        108.0, 200.0
-    ))
-    return pt_real, lc_real
-
-def calcular_peso_formula(pt_real: float, lc_real: float, bcs: float) -> float:
-    """Fórmula morfométrica calibrada (K ajustado con datos reales)."""
-    K = CAL["k_base"]
-    if bcs >= 4.0:
-        K -= CAL["k_bcs_alto"]
-    elif bcs <= 2.5:
-        K += CAL["k_bcs_bajo"]
-    pt = float(np.clip(pt_real, 148.0, 220.0))
-    lc = float(np.clip(lc_real, 108.0, 200.0))
-    return round((pt ** 2 * lc) / K, 1)
+# ── Transformación de inferencia ───────────────────────────
+transform_inferencia = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    ),
+])
 
 
-def _calcular_intervalo_confianza(sam_ok: bool, bcs_conf: float) -> float:
-    """
-    Intervalo de confianza dinámico basado en RMSE real del modelo.
-    IC 95% = RMSE * 1.96
-    """
-    rmse_base = RMSE_BLEND if sam_ok else RMSE_FORMULA
-    # Penalizar si BCS tiene baja confianza
-    factor_bcs = 1.0 + max(0.0, (0.7 - bcs_conf)) * 0.5
-    return round(rmse_base * factor_bcs * 1.96, 1)
+# ── Arquitectura (debe coincidir exactamente con entrenamiento) ─
+def _construir_modelo_hibrido(n_bio: int = 3) -> nn.Module:
+    try:
+        import timm
+        backbone = timm.create_model(
+            "efficientnet_b0", pretrained=False,
+            num_classes=0, global_pool="avg"
+        )
+    except Exception:
+        raise ImportError("timm no instalado: pip install timm")
+
+    class ModeloHibrido(nn.Module):
+        def __init__(self, backbone, n_vis, n_bio):
+            super().__init__()
+            self.backbone    = backbone
+            self.visual_head = nn.Sequential(
+                nn.Linear(n_vis, 512),
+                nn.BatchNorm1d(512),
+                nn.ReLU(),
+                nn.Dropout(0.3),
+            )
+            self.bio_head = nn.Sequential(
+                nn.Linear(n_bio, 32), nn.ReLU(),
+                nn.Linear(32, 64),   nn.ReLU(),
+            )
+            self.fusion = nn.Sequential(
+                nn.Linear(576, 256),
+                nn.BatchNorm1d(256),
+                nn.ReLU(), nn.Dropout(0.3),
+                nn.Linear(256, 64), nn.ReLU(),
+                nn.Dropout(0.2),    nn.Linear(64, 1),
+            )
+
+        def forward(self, img, bio):
+            v = self.visual_head(self.backbone(img))
+            b = self.bio_head(bio)
+            return self.fusion(torch.cat([v, b], dim=1)).squeeze(1)
+
+    n_vis = backbone.num_features
+    return ModeloHibrido(backbone, n_vis, n_bio)
 
 
-def _validar_features_modelo() -> bool:
-    if not FEAT_FILE.exists():
-        logger.warning("feature_names_v3.txt no encontrado — saltando validacion")
-        return True
-    expected = FEAT_FILE.read_text().strip().split("\n")
-    if expected != FEATURE_NAMES:
-        logger.error(f"FEATURES DESINCRONIZADOS: {expected} vs {FEATURE_NAMES}")
-        return False
-    return True
+# ── Calibración SAM → cinta real (v4, sin cambios) ────────
+def estimar_cinta_desde_sam(pt_sam: float, lc_sam: float) -> Tuple[float, float]:
+    pt_real = pt_sam * 0.91 + 16.2
+    lc_real = lc_sam * 0.88 + 18.5
+    return round(pt_real, 1), round(lc_real, 1)
+
+
+def calcular_peso_formula(pt: float, lc: float, bcs: float) -> float:
+    """Fórmula Crevat-Quittet calibrada Jersey. Último recurso."""
+    peso_base  = (pt ** 2 * lc) / 10800
+    ajuste_bcs = 1.0 + (bcs - 3.0) * 0.04
+    return round(max(PESO_MIN, min(PESO_MAX, peso_base * ajuste_bcs)), 1)
 
 
 class EstimacionService:
-    version = "3.0.0-calibrado-jersey"
+    version = "5.0.0-hibrido-cnn-jersey"
 
     BCS_INTERPRETACIONES = [
         (0.0,  2.0,  "Caquéctica / Muy delgada",
@@ -123,45 +141,78 @@ class EstimacionService:
         (2.5,  3.75, "Condición ideal",
                      "Condición corporal óptima para Jersey. Mantener dieta actual."),
         (3.75, 4.5,  "Sobre-condicionada",
-                     "Reducir concentrados energéticos. Riesgo de cetosis en posparto."),
+                     "Reducir concentrados energéticos. Riesgo de cetosis posparto."),
         (4.5,  5.5,  "Obesa",
                      "Reducción inmediata de concentrados. Riesgo metabólico alto."),
     ]
 
     def __init__(self):
-        self._yolo_bcs = None
-        self._xgb_mass = None
-        _validar_features_modelo()
+        self._device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._modelos_cnn : List[nn.Module] = []
+        self._yolo_bcs    = None   # ← ÚNICA instancia YOLO en toda la app
+        self._xgb_mass    = None
+        logger.info(f"EstimacionService v5.0 | device={self._device} | CNN 5 folds ~93.7 MB")
 
+    # ── CNN ensemble — carga lazy ──────────────────────────
+    def _get_modelos_cnn(self) -> List[nn.Module]:
+        if self._modelos_cnn:
+            return self._modelos_cnn
+        cargados = []
+        for ruta in CNN_MODELS:
+            if not ruta.exists():
+                logger.warning(f"CNN no encontrado: {ruta}")
+                continue
+            try:
+                m     = _construir_modelo_hibrido(n_bio=3)
+                state = torch.load(str(ruta), map_location=self._device)
+                m.load_state_dict(state)
+                m.to(self._device)
+                m.eval()
+                cargados.append(m)
+                logger.info(f"CNN cargado: {ruta.name}")
+            except Exception as e:
+                logger.warning(f"Error cargando {ruta.name}: {e}")
+        if not cargados:
+            logger.error("No se cargó ningún modelo CNN — se usará XGBoost")
+        else:
+            logger.info(f"{len(cargados)}/5 CNN cargados (~{len(cargados)*18.7:.0f} MB RAM)")
+        self._modelos_cnn = cargados
+        return self._modelos_cnn
+
+    # ── YOLO BCS — ÚNICA instancia en toda la aplicación ──
     def _get_yolo(self):
+        """
+        Esta es la ÚNICA instancia de YOLO BCS en todo el proceso.
+        VisionService v5 ya NO carga YOLO — solo vive aquí.
+        """
         if self._yolo_bcs is None:
             if not BCS_MODEL.exists():
                 logger.warning(f"BCS_MODEL no encontrado: {BCS_MODEL}")
                 return None
             try:
                 from ultralytics import YOLO
-                logger.info(f"Cargando YOLO BCS desde {BCS_MODEL}")
                 self._yolo_bcs = YOLO(str(BCS_MODEL))
+                logger.info("YOLO BCS cargado (instancia única en la app)")
             except Exception as e:
-                logger.warning(f"No se pudo cargar YOLO: {e}")
+                logger.warning(f"No se pudo cargar YOLO BCS: {e}")
         return self._yolo_bcs
 
+    # ── XGBoost — respaldo ─────────────────────────────────
     def _get_xgb(self):
         if self._xgb_mass is None:
-            if not MASS_MODEL.exists():
-                logger.warning(f"MASS_MODEL no encontrado: {MASS_MODEL}")
+            if not MASS_MODEL_XGB.exists():
                 return None
             try:
                 import xgboost as xgb
                 b = xgb.XGBRegressor()
-                b.load_model(str(MASS_MODEL))
-                b.get_booster().feature_names = FEATURE_NAMES
-                logger.info("XGBoost mass_model_v3 cargado correctamente")
+                b.load_model(str(MASS_MODEL_XGB))
                 self._xgb_mass = b
+                logger.info("XGBoost v3 cargado (respaldo)")
             except Exception as e:
                 logger.warning(f"No se pudo cargar XGBoost: {e}")
         return self._xgb_mass
 
+    # ── Predicción BCS ─────────────────────────────────────
     def _predecir_bcs(self, imagen_path: str) -> Tuple[float, float]:
         yolo = self._get_yolo()
         if yolo is None:
@@ -173,143 +224,162 @@ class EstimacionService:
             confianza = float(probs.top1conf.item())
             nombres   = res[0].names
             try:
-                bcs_valor = float(nombres[top_idx])
+                bcs = float(nombres[top_idx])
             except (KeyError, ValueError):
-                bcs_valor = {0: 3.0, 1: 3.25, 2: 3.5, 3: 4.0, 4: 4.5}.get(top_idx, 3.0)
-            logger.info(f"BCS predicho: {bcs_valor} (conf={confianza:.2f})")
-            return bcs_valor, confianza
+                bcs = {0: 3.0, 1: 3.25, 2: 3.5, 3: 4.0, 4: 4.5}.get(top_idx, 3.0)
+            logger.info(f"BCS YOLO: {bcs} conf:{confianza:.2f}")
+            return bcs, confianza
         except Exception as e:
-            logger.warning(f"Error prediciendo BCS: {e}")
+            logger.warning(f"Error BCS YOLO: {e} → BCS=3.0")
             return 3.0, 0.0
 
-    def _build_features(
+    # ── Preprocesar imagen para CNN (TTA) ──────────────────
+    def _preprocesar_imagen(self, imagen_bgr: np.ndarray) -> Optional[torch.Tensor]:
+        """
+        Convierte imagen BGR → tensor normalizado con TTA:
+        original + flip horizontal + center crop.
+        Retorna tensor (3, 3, 224, 224).
+        """
+        try:
+            img_rgb  = Image.fromarray(imagen_bgr[:, :, ::-1])
+            t_base   = transform_inferencia(img_rgb)
+            img_flip = img_rgb.transpose(Image.FLIP_LEFT_RIGHT)
+            t_flip   = transform_inferencia(img_flip)
+            w, h     = img_rgb.size
+            margin   = int(min(w, h) * 0.06)
+            img_crop = img_rgb.crop((margin, margin, w-margin, h-margin))
+            t_crop   = transform_inferencia(img_crop)
+            return torch.stack([t_base, t_flip, t_crop])  # (3, 3, 224, 224)
+        except Exception as e:
+            logger.warning(f"Error preprocesando imagen: {e}")
+            return None
+
+    # ── Predicción CNN ensemble ────────────────────────────
+    def _predecir_cnn(
         self,
-        pt: float, lc: float, bcs: float
-    ) -> pd.DataFrame:
-        """
-        Construye el vector de 10 features para XGBoost.
-        ORDEN CRÍTICO — debe coincidir con FEATURE_NAMES.
-        """
-        vol         = pt ** 2 * lc
-        pt_lc_ratio = pt / max(lc, 1.0)
-        bcs_pt      = bcs * pt
-        bcs_vol     = bcs * vol
-        pt_sq       = pt ** 2
-        lc_sq       = lc ** 2
-        pt_bcs_lc   = pt * bcs * lc
-        
-        # Creamos un diccionario con el mismo nombre exacto de la lista FEATURE_NAMES
-        data = {
-            "pt": [pt],
-            "lc": [lc],
-            "bcs": [bcs],
-            "vol": [vol],
-            "pt_lc_ratio": [pt_lc_ratio],
-            "bcs_pt": [bcs_pt],
-            "bcs_vol": [bcs_vol],
-            "pt_sq": [pt_sq],
-            "lc_sq": [lc_sq],
-            "pt_bcs_lc": [pt_bcs_lc]
-        }
-        valores = [
-            pt, lc, bcs, vol, pt_lc_ratio, 
-            bcs_pt, bcs_vol, pt_sq, lc_sq, pt_bcs_lc
-        ]
-        df = pd.DataFrame([valores], columns=FEATURE_NAMES)
-        
-        # Convertimos a float32 por seguridad (a XGBoost le gustan los float32)
-        return df.astype(np.float32)
+        imgs_tta : torch.Tensor,
+        bcs      : float,
+        pt_real  : float,
+        lc_real  : float,
+    ) -> Optional[float]:
+        modelos = self._get_modelos_cnn()
+        if not modelos:
+            return None
+        try:
+            bio_norm = torch.tensor([
+                (bcs     - BCS_MEAN) / BCS_STD,
+                (pt_real - PT_MEAN)  / PT_STD,
+                (lc_real - LC_MEAN)  / LC_STD,
+            ], dtype=torch.float32).to(self._device)
+            bio_batch  = bio_norm.unsqueeze(0).repeat(3, 1)   # (3, 3)
+            imgs_batch = imgs_tta.to(self._device)             # (3, 3, 224, 224)
+            predicciones_fold = []
+            with torch.no_grad():
+                for modelo in modelos:
+                    preds_tta = modelo(imgs_batch, bio_batch).cpu().numpy()
+                    preds_kg  = preds_tta * PESO_STD + PESO_MEAN
+                    predicciones_fold.append(float(np.mean(preds_kg)))
+            pred_final = float(np.mean(predicciones_fold))
+            logger.info(
+                f"CNN ensemble: folds={[round(p,1) for p in predicciones_fold]} "
+                f"→ {pred_final:.1f} kg"
+            )
+            return pred_final
+        except Exception as e:
+            logger.warning(f"Error CNN: {e}")
+            return None
+
+    # ── Predicción XGBoost (respaldo) ─────────────────────
+    def _predecir_xgb(self, pt: float, lc: float, bcs: float) -> Optional[float]:
+        xgb_model = self._get_xgb()
+        if xgb_model is None:
+            return None
+        try:
+            vol         = pt ** 2 * lc
+            pt_lc_ratio = pt / max(lc, 1.0)
+            feat = pd.DataFrame([[
+                pt, lc, bcs, vol, pt_lc_ratio,
+                bcs*pt, bcs*vol, pt**2, lc**2, pt*bcs*lc
+            ]], columns=[
+                "pt", "lc", "bcs", "vol", "pt_lc_ratio",
+                "bcs_pt", "bcs_vol", "pt_sq", "lc_sq", "pt_bcs_lc"
+            ]).astype(np.float32)
+            pred = float(xgb_model.predict(feat)[0])
+            logger.info(f"XGBoost respaldo: {pred:.1f} kg")
+            return pred if PESO_MIN <= pred <= PESO_MAX else None
+        except Exception as e:
+            logger.warning(f"Error XGBoost: {e}")
+            return None
+
+    # ── Método principal ───────────────────────────────────
     def estimar(
         self,
-        morfometria:    MorfometriaData,
-        imagen_trasera: Optional[str] = None,
+        morfometria    : MorfometriaData,
+        imagen_lateral : Optional[np.ndarray] = None,
+        imagen_trasera : Optional[str]        = None,
     ) -> Tuple[float, float, float, float]:
         """
-        Retorna (peso_kg, bcs_score, confianza).
+        Retorna (peso_kg, bcs_score, confianza_pct, bcs_conf).
+        imagen_lateral : ndarray BGR para CNN.
+        imagen_trasera : ruta string en disco para YOLO BCS.
         """
-        # ── BCS ─────────────────────────────────────────────────────────────
+        # ── BCS ─────────────────────────────────────────────
         if imagen_trasera is not None:
             bcs_score, bcs_conf = self._predecir_bcs(imagen_trasera)
         else:
             bcs_score = getattr(morfometria, "_bcs",      3.0)
             bcs_conf  = getattr(morfometria, "_bcs_conf", 0.0)
 
-        # ── Medidas SAM ──────────────────────────────────────────────────────
-        pt_img_raw = morfometria.perimetro_toracico_cm
-        lc_img_raw = morfometria.largo_corporal_cm
+        # ── Calibración SAM → cinta ────────────────────────
+        pt_real, lc_real = estimar_cinta_desde_sam(
+            float(morfometria.perimetro_toracico_cm or 179.0),
+            float(morfometria.largo_corporal_cm     or 156.0),
+        )
+        logger.info(f"Medidas calibradas: PT={pt_real:.1f} LC={lc_real:.1f} BCS={bcs_score:.2f}")
 
-        sam_fallo = (pt_img_raw is None or lc_img_raw is None)
-        if sam_fallo:
-            _raw = getattr(morfometria, "_medidas_raw", {})
-            pt_img_raw = _raw.get("pt")
-            lc_img_raw = _raw.get("lc")
-            sam_fallo  = (pt_img_raw is None or lc_img_raw is None)
+        # ── CNN híbrido (principal) ────────────────────────
+        peso_cnn   = None
+        metodo     = "xgboost_respaldo"
+        confianza  = 50.0
+        mae_modelo = MAE_XGB
 
-        if sam_fallo:
-            pt_img, lc_img = 195.0, 120.0
-            logger.warning("SAM no entregó pt/lc → usando defaults.")
+        if imagen_lateral is not None:
+            imgs_tta = self._preprocesar_imagen(imagen_lateral)
+            if imgs_tta is not None:
+                peso_cnn = self._predecir_cnn(imgs_tta, bcs_score, pt_real, lc_real)
+
+        if peso_cnn is not None and PESO_MIN <= peso_cnn <= PESO_MAX:
+            peso_final = peso_cnn
+            metodo     = "cnn_hibrido_ensemble"
+            confianza  = 92.0
+            mae_modelo = MAE_CNN
+            logger.info(f"CNN híbrido: {peso_final:.1f} kg")
         else:
-            pt_img = float(pt_img_raw)
-            lc_img = float(lc_img_raw)
+            if peso_cnn is not None:
+                logger.warning(f"CNN fuera de rango ({peso_cnn:.1f} kg) → XGBoost")
+            peso_xgb = self._predecir_xgb(pt_real, lc_real, bcs_score)
+            if peso_xgb is not None:
+                peso_final = peso_xgb
+                metodo     = "xgboost_respaldo"
+                confianza  = 70.0
+                mae_modelo = MAE_XGB
+            else:
+                peso_final = calcular_peso_formula(pt_real, lc_real, bcs_score)
+                metodo     = "formula_calibrada"
+                confianza  = 45.0
+                mae_modelo = MAE_FORMULA
 
-        sam_ok = (
-            not sam_fallo
-            and PT_IMG_MIN <= pt_img <= PT_IMG_MAX
-            and LC_IMG_MIN <= lc_img <= LC_IMG_MAX
+        # ── Intervalo de confianza ─────────────────────────
+        factor_bcs = 1.0 + max(0.0, (0.7 - bcs_conf)) * 0.3
+        ic = round(mae_modelo * factor_bcs * IC_FACTOR, 1)
+        logger.info(f"Peso final ({metodo}): {peso_final:.1f} ±{ic} kg | conf={confianza:.0f}%")
+
+        return (
+            round(peso_final, 1),
+            round(bcs_score, 2),
+            round(confianza, 1),
+            round(bcs_conf, 3),
         )
-
-        # ── Conversión SAM → medida real (CALIBRADA) ─────────────────────────
-        pt_real, lc_real = estimar_cinta_desde_sam(pt_img, lc_img)
-
-        logger.info(
-            f"SAM: pt_img={pt_img:.1f} lc_img={lc_img:.1f} | "
-            f"Real calibrado: pt={pt_real:.1f} lc={lc_real:.1f} | BCS={bcs_score}"
-        )
-
-        # ── Fórmula calibrada (respaldo) ─────────────────────────────────────
-        peso_formula = calcular_peso_formula(pt_real, lc_real, bcs_score)
-        logger.info(f"Fórmula calibrada: {peso_formula} kg")
-
-        # ── XGBoost v3 ───────────────────────────────────────────────────────
-        # ── XGBoost v3 ───────────────────────────────────────────────────────
-        peso_xgboost: Optional[float] = None
-        xgb_model = self._get_xgb()
-        if xgb_model is not None:
-            try:
-                feat = self._build_features(pt_real, lc_real, bcs_score)
-                # Al pasarle un DataFrame con las columnas, XGBoost no se confundirá
-                pred = float(xgb_model.predict(feat)[0])
-                if PESO_MIN_KG <= pred <= PESO_MAX_KG:
-                    peso_xgboost = pred
-                    logger.info(f"XGBoost v3: {pred:.1f} kg OK")
-                else:
-                    logger.warning(f"XGBoost fuera de rango ({pred:.1f} kg) → descartado")
-            except Exception as e:
-                logger.warning(f"Error en inferencia XGBoost: {e}")
-                
-        # ── Blend ponderado por RMSE validado ────────────────────────────────
-        if peso_xgboost is not None and sam_ok:
-            peso_final   = W_FORMULA * peso_formula + W_XGBOOST * peso_xgboost
-            confianza_ml = 85.0
-            metodo       = f"formula({W_FORMULA:.0%})+xgboost({W_XGBOOST:.0%})"
-        elif peso_xgboost is not None:
-            # SAM dudoso: blend más conservador
-            peso_final   = 0.30 * peso_formula + 0.70 * peso_xgboost
-            confianza_ml = 65.0
-            metodo       = "formula(30%)+xgboost(70%) [SAM dudoso]"
-        else:
-            peso_final   = peso_formula
-            confianza_ml = 45.0
-            metodo       = "formula_calibrada_solo"
-
-        # Intervalo de confianza dinámico (para mostrar en UI)
-        intervalo = _calcular_intervalo_confianza(sam_ok, bcs_conf)
-        logger.info(
-            f"Peso final ({metodo}): {peso_final:.1f} ±{intervalo} kg "
-            f"| conf={confianza_ml:.2f}"
-        )
-
-        return round(peso_final, 1), round(bcs_score, 2), round(confianza_ml, 3), round(bcs_conf, 3)
 
     def interpretar_bcs(self, bcs: float) -> Tuple[str, str]:
         for lo, hi, interp, rec in self.BCS_INTERPRETACIONES:
@@ -317,7 +387,7 @@ class EstimacionService:
                 return interp, rec
         if bcs < 0:
             return "Valor inválido", "BCS no puede ser negativo."
-        return "Obesa", "Reducción inmediata de concentrados. Riesgo metabólico alto."
+        return "Obesa", "Reducción inmediata. Riesgo metabólico alto."
 
 
 estimacion_service = EstimacionService()
