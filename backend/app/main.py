@@ -14,6 +14,7 @@ from app.controllers.admin_controller import router as admin_router
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.animal_controller import hato_router, animal_router
 from app.controllers.analisis_controller import router as analisis_router
+from app.controllers.validacion_controller import router as validacion_router  # ← AÑADIDO
 from app.controllers.reportes_controller import router as reporte_router
 from app.controllers.dashboard_controller import router as dashboard_router
 from app.controllers.bovinos_controller import router as bovinos_router
@@ -38,7 +39,6 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Tablas verificadas (dev mode)")
 
-    # Cargar modelos en background — no bloquea el arranque del servidor
     loop = asyncio.get_event_loop()
     executor = ThreadPoolExecutor(max_workers=1)
     loop.run_in_executor(executor, descargar_modelos)
@@ -64,10 +64,10 @@ mediante análisis de imágenes con visión por computadora.
 4. Obtén peso estimado y BCS al instante
 
 ### Tecnologías:
-- **Segmentación**: SAM (Segment Anything Model)
-- **BCS**: YOLOv8 (foto trasera)
+- **Segmentación**: MobileSAM (vit_t)
+- **BCS**: YOLOv8 clasificación (foto trasera)
 - **Morfometría**: OpenCV
-- **Estimación**: XGBoost + Fórmula calibrada Jersey
+- **Estimación**: CNN híbrida EfficientNet-B0 + XGBoost respaldo
     """,
     version=settings.APP_VERSION,
     docs_url="/docs",
@@ -75,9 +75,7 @@ mediante análisis de imágenes con visión por computadora.
     lifespan=lifespan,
 )
 
-# ── CORS ─────────────────────────────────────────────────────────────────────
-# allow_origins=["*"] con allow_credentials=False permite cualquier origen
-# Cámbialo a la lista específica cuando todo funcione
+# ── CORS ──────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS_LIST,
@@ -91,14 +89,15 @@ Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 API_PREFIX = "/api/v1"
-app.include_router(auth_router,      prefix=API_PREFIX)
-app.include_router(admin_router,     prefix=API_PREFIX)
-app.include_router(hato_router,      prefix=API_PREFIX)
-app.include_router(animal_router,    prefix=API_PREFIX)
-app.include_router(analisis_router,  prefix=API_PREFIX)
-app.include_router(reporte_router,   prefix=API_PREFIX)
-app.include_router(bovinos_router,   prefix=API_PREFIX)
-app.include_router(dashboard_router, prefix=API_PREFIX)
+app.include_router(auth_router,        prefix=API_PREFIX)
+app.include_router(admin_router,       prefix=API_PREFIX)
+app.include_router(hato_router,        prefix=API_PREFIX)
+app.include_router(animal_router,      prefix=API_PREFIX)
+app.include_router(analisis_router,    prefix=API_PREFIX)
+app.include_router(validacion_router,  prefix=API_PREFIX)  # ← AÑADIDO
+app.include_router(reporte_router,     prefix=API_PREFIX)
+app.include_router(bovinos_router,     prefix=API_PREFIX)
+app.include_router(dashboard_router,   prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Sistema"])
