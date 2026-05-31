@@ -56,6 +56,9 @@ huggingface-hub==0.23.0
 # ── Reportes ──────────────────────────────────────────────
 reportlab>=4.0.0
 
+ 
+# ── ONNX Runtime (validacion_service — 20 MB vs 80 MB de ultralytics)
+onnxruntime==1.18.1
 # ── Testing ───────────────────────────────────────────────
 pytest==8.2.0
 pytest-asyncio==0.23.7
