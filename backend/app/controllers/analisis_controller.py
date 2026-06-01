@@ -128,6 +128,9 @@ async def analizar_vaca(
         morfometria           = morfometria_real,
         medicion_id           = medicion_id,
         procesado_en_segundos = round(time.time() - inicio, 2),
+    
+        confianza_peso=0.0,
+        confianza_bcs=0.0,
     )
 
 
