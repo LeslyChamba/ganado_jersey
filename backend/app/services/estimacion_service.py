@@ -104,7 +104,8 @@ class EstimacionService:
         # ── Llamada HTTP al Motor de Inferencia ───────────
         try:
             respuesta = httpx.post(
-                f"{_HF_URL}/predecir",
+                _HF_URL,  
+                headers={"X-Inference-Secret": _HF_SECRET},
                 headers={"X-Inference-Secret": _HF_SECRET},
                 files={
                     "imagen_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
