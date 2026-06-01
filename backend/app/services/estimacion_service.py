@@ -106,7 +106,6 @@ class EstimacionService:
             respuesta = httpx.post(
                 _HF_URL,  
                 headers={"X-Inference-Secret": _HF_SECRET},
-                headers={"X-Inference-Secret": _HF_SECRET},
                 files={
                     "imagen_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
                     "imagen_trasera": ("trasera.jpg", bytes_trasera, "image/jpeg"),
