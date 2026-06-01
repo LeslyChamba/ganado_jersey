@@ -32,3 +32,6 @@ emails==0.6
 # ─── Validación ──────────────────────────────────────────
 pydantic[email]==2.7.1
 pydantic-settings==2.2.1
+
+# ─── Reportes ──────────────────────────────────────────
+reportlab==4.1.0
