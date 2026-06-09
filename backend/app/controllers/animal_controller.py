@@ -322,23 +322,34 @@ def _get_animal_o_404(animal_id: uuid.UUID, usuario_id: uuid.UUID, db: Session) 
 
 
 def _enriquecer_animal(animal: Animal, db: Session) -> AnimalResponse:
+    # 1. Consultar el total de mediciones del animal
     total = db.query(func.count(Medicion.id)).filter(
         Medicion.animal_id == animal.id
     ).scalar()
+    
+    # 2. Consultar la última medición registrada
     ultima = db.query(Medicion).filter(
         Medicion.animal_id == animal.id
     ).order_by(Medicion.fecha_medicion.desc()).first()
 
+    # 3. Consultar el hato para obtener su nombre (Evita el ValueError)
+    hato = db.query(Hato).filter(Hato.id == animal.hato_id).first()
+    nombre_del_hato = hato.nombre if hato else None
+
+    # 4. Convertir el modelo de la base de datos a la estructura base de Pydantic
     r = AnimalResponse.model_validate(animal)
-    r.total_mediciones = total or 0
-    if animal.hato_id:                                              # ← NUEVO
-        hato = db.query(Hato).filter(Hato.id == animal.hato_id).first()  # ← NUEVO
-        r.hato_nombre = hato.nombre if hato else None 
-    if ultima:
-        r.ultima_medicion = ultima.fecha_medicion
-        r.ultimo_peso_kg  = ultima.peso_estimado_kg
-        r.ultimo_bcs      = ultima.bcs
-    return r
+    
+    # 5. Crear el diccionario con todos los campos adicionales/enriquecidos
+    datos_enriquecidos = {
+        "total_mediciones": total or 0,
+        "hato_nombre": nombre_del_hato,
+        "ultima_medicion": ultima.fecha_medicion if ultima else None,
+        "ultimo_peso_kg": ultima.peso_estimado_kg if ultima else None,
+        "ultimo_bcs": ultima.bcs if ultima else None
+    }
+    
+    # 6. Retornar la copia del esquema con los datos inyectados de golpe
+    return r.model_copy(update=datos_enriquecidos)
 
 
 
