@@ -117,6 +117,7 @@ class AnimalResponse(BaseModel):
     proposito: Optional[PropositoAnimal]
     notas: Optional[str]
     hato_id: uuid.UUID
+    hato_nombre: Optional[str] = None
     total_mediciones: Optional[int] = 0
     ultima_medicion: Optional[datetime] = None
     ultimo_peso_kg: Optional[float] = None
