@@ -52,11 +52,11 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (bloqueado) return
-    setErrorMsg('')
-    setIntentosRestantes(null)
     setLoading(true)
     try {
       const res = await authApi.login(form.email, form.password)
+      setErrorMsg('')
+      setIntentosRestantes(null)
       login(res.data.usuario, res.data.access_token)
       toast.success(`Bienvenida, ${res.data.usuario.nombre}`)
       
