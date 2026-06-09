@@ -4,18 +4,15 @@ import { reportesApi, hatosApi } from '../services/api'
 import { formatFecha } from '../services/helpers'
 import { FileText, Download, BarChart2, Weight, TrendingUp, AlertTriangle, Calendar, Filter, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
-/* ── Tokens de color de la marca JER-WEIGHT ── */
 const C = {
   primary: '#081C11', accent: '#52D9A0', accentDark: '#1B4332',
   textSecondary: '#2A5C3A', bg: '#F0FBF6', white: '#FFFFFF', danger: '#EF4444'
 }
-/* ── Tokens de tipografía ── */
 const F = {
   brand: "Cambria, 'Times New Roman', serif",
   body:  "Arial, Helvetica, sans-serif",
 }
 
-// ─── Descarga un blob como archivo ────────────────────────────────────────
 function descargarBlob(blob, nombreArchivo) {
   const url  = window.URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -27,12 +24,38 @@ function descargarBlob(blob, nombreArchivo) {
   window.URL.revokeObjectURL(url)
 }
 
-// ─── Tipos de reporte disponibles ─────────────────────────────────────────
+// ── subtipo coincide exactamente con los valores que acepta el backend ──
 const REPORTES = [
-  { id: 'bcs', tipoDb: 'GENERAL', icon: BarChart2, title: 'Reporte BCS General', desc: 'Condición corporal de todos los animales registrados.', bcs_min: 1, bcs_max: 5 },
-  { id: 'pesos', tipoDb: 'GENERAL', icon: Weight, title: 'Reporte de Pesos', desc: 'Evolución histórica de peso por animal y por hato.', bcs_min: undefined, bcs_max: undefined },
-  { id: 'alertas', tipoDb: 'GENERAL', icon: AlertTriangle, title: 'Animales en Alerta', desc: 'Listado de animales con BCS fuera del rango recomendado (< 2.5).', bcs_min: 1, bcs_max: 2.49 },
-  { id: 'tendencias', tipoDb: 'GENERAL', icon: TrendingUp, title: 'Tendencias Mensuales', desc: 'Comparativa de mediciones y BCS agrupadas por mes.', bcs_min: undefined, bcs_max: undefined },
+  {
+    id: 'bcs',
+    subtipo: 'bcs',
+    icon: BarChart2,
+    title: 'Reporte BCS General',
+    desc: 'Distribución de condición corporal de todos los animales. Incluye conteo por categoría (Ideal, Delgada, Obesa, etc.) y tabla detallada.',
+  },
+  {
+    id: 'pesos',
+    subtipo: 'pesos',
+    icon: Weight,
+    title: 'Reporte de Pesos',
+    desc: 'Último peso registrado por animal con variación respecto a la medición anterior. Incluye estadísticas de peso del hato.',
+  },
+  {
+    id: 'alertas',
+    subtipo: 'alertas',
+    icon: AlertTriangle,
+    title: 'Animales en Alerta',
+    desc: 'Listado de animales con BCS < 2.5 que requieren atención inmediata, con recomendación de acción para cada caso.',
+    bcs_min: 1,
+    bcs_max: 2.49,
+  },
+  {
+    id: 'tendencias',
+    subtipo: 'tendencias',
+    icon: TrendingUp,
+    title: 'Tendencias Mensuales',
+    desc: 'Peso y BCS promedio agrupados por mes. Identifica meses con mayor número de alertas y evolución del hato en el tiempo.',
+  },
 ]
 
 export default function ReportesPage() {
@@ -62,17 +85,20 @@ export default function ReportesPage() {
     setLoading(reporte.id)
     try {
       const params = {
-        titulo:      reporte.title,
-        ...(fechaDesde && { fecha_desde: new Date(fechaDesde).toISOString() }),
-        ...(fechaHasta && { fecha_hasta: new Date(fechaHasta + 'T23:59:59').toISOString() }),
-        ...(hatoSeleccionado && { hato_id: hatoSeleccionado }),
-        ...(raza && { raza }),
+        // ── CLAVE: enviar subtipo para que el backend genere el PDF correcto ──
+        subtipo: reporte.subtipo,
+        titulo:  reporte.title,
+        ...(fechaDesde        && { fecha_desde: new Date(fechaDesde).toISOString() }),
+        ...(fechaHasta        && { fecha_hasta: new Date(fechaHasta + 'T23:59:59').toISOString() }),
+        ...(hatoSeleccionado  && { hato_id: hatoSeleccionado }),
+        ...(raza              && { raza }),
+        // bcs_min / bcs_max solo para reportes que los necesitan (alertas)
         ...(reporte.bcs_min !== undefined && { bcs_min: reporte.bcs_min }),
         ...(reporte.bcs_max !== undefined && { bcs_max: reporte.bcs_max }),
       }
       const res = await reportesApi.exportarPdf(params)
-      const fecha = new Date().toISOString().slice(0,10).replace(/-/g,'')
-      descargarBlob(res.data, `${reporte.id}_${fecha}.pdf`)
+      const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      descargarBlob(res.data, `${reporte.subtipo}_${fecha}.pdf`)
       mostrarToast('PDF descargado correctamente')
       refetchHistorial()
     } catch (e) {
@@ -81,25 +107,28 @@ export default function ReportesPage() {
     } finally {
       setLoading(null)
     }
-   
   }
-   const hoy = new Date();
+
+  const hoy = new Date()
   const fechaActualLocal = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
     .toISOString()
-    .split('T')[0];
+    .split('T')[0]
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8 relative z-10">
 
-      {/* TOAST PERSONALIZADO */}
+      {/* TOAST */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl animate-in slide-in-from-top-4 fade-in duration-300"
           style={{
             background: toastMsg.tipo === 'error' ? '#FEF2F2' : C.primary,
             border: `1px solid ${toastMsg.tipo === 'error' ? '#FCA5A5' : C.accentDark}`,
           }}>
-          {toastMsg.tipo === 'error' ? <XCircle size={20} color={C.danger} /> : <CheckCircle2 size={20} color={C.accent} />}
-          <span className="font-mono text-xs font-bold uppercase tracking-wider" style={{ color: toastMsg.tipo === 'error' ? C.danger : C.white }}>
+          {toastMsg.tipo === 'error'
+            ? <XCircle size={20} color={C.danger} />
+            : <CheckCircle2 size={20} color={C.accent} />}
+          <span className="font-mono text-xs font-bold uppercase tracking-wider"
+            style={{ color: toastMsg.tipo === 'error' ? C.danger : C.white }}>
             {toastMsg.msg}
           </span>
         </div>
@@ -115,7 +144,7 @@ export default function ReportesPage() {
         </p>
       </div>
 
-      {/* FILTROS DE REPORTE */}
+      {/* FILTROS */}
       <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-emerald-50">
         <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest mb-5" style={{ color: C.accentDark }}>
           <Filter size={14} /> Filtros de Exportación
@@ -123,47 +152,60 @@ export default function ReportesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           <div>
             <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Desde la fecha</label>
-            <input type="date" max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: F.body }} value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} />
+            <input type="date" max={fechaActualLocal}
+              className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all"
+              style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: F.body }}
+              value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} />
           </div>
           <div>
             <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Hasta la fecha</label>
-            <input type="date" min={fechaDesde} max={fechaActualLocal} className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: F.body }} value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} />
+            <input type="date" min={fechaDesde} max={fechaActualLocal}
+              className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all"
+              style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary, fontFamily: F.body }}
+              value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} />
           </div>
           <div>
             <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Ubicación / Hato</label>
-            <select className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all font-sans font-medium" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary }} value={hatoSeleccionado} onChange={e => setHatoSeleccionado(e.target.value)}>
+            <select className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all font-sans font-medium"
+              style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary }}
+              value={hatoSeleccionado} onChange={e => setHatoSeleccionado(e.target.value)}>
               <option value="">— Todos los hatos —</option>
               {hatos.map(h => <option key={h.id} value={h.id}>{h.nombre} — {h.finca}</option>)}
             </select>
           </div>
           <div>
             <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textSecondary }}>Filtrar por Raza</label>
-            <input type="text" placeholder="Ej: Jersey" className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all" style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary }} value={raza} onChange={e => setRaza(e.target.value)} />
+            <input type="text" placeholder="Ej: Jersey"
+              className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-all"
+              style={{ background: '#F9FDFB', borderColor: 'rgba(27, 67, 50, 0.15)', color: C.primary }}
+              value={raza} onChange={e => setRaza(e.target.value)} />
           </div>
         </div>
       </div>
 
-      {/* TARJETAS DE REPORTE */}
+      {/* TARJETAS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {REPORTES.map((r, i) => {
           const Icon = r.icon
           const esCargando = loading === r.id
           return (
-            <div key={r.id} 
+            <div key={r.id}
               className="bg-white rounded-[1.5rem] p-6 flex flex-col transition-all duration-300 relative overflow-hidden group"
               style={{ boxShadow: '0 10px 30px rgba(8, 28, 17, 0.04)', border: '1px solid rgba(82, 217, 160, 0.15)', animationDelay: `${i * 100}ms` }}>
-              
-              <div className="absolute top-0 left-0 w-full h-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: `linear-gradient(90deg, ${C.accent}, ${C.accentDark})` }} />
+
+              <div className="absolute top-0 left-0 w-full h-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: `linear-gradient(90deg, ${C.accent}, ${C.accentDark})` }} />
 
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner" style={{ background: '#E8F8F1' }}>
                   <Icon size={20} style={{ color: C.accentDark }} />
                 </div>
-                <span className="font-mono text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold" style={{ background: '#E8F8F1', color: C.accentDark }}>
+                <span className="font-mono text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold"
+                  style={{ background: '#E8F8F1', color: C.accentDark }}>
                   Formato PDF
                 </span>
               </div>
-              
+
               <div className="flex-1 mb-6">
                 <h3 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>
                   {r.title}
@@ -172,27 +214,29 @@ export default function ReportesPage() {
                   {r.desc}
                 </p>
               </div>
-              
+
               <button onClick={() => handleExportar(r)} disabled={esCargando}
                 className="w-full py-3.5 rounded-xl font-mono text-sm font-bold uppercase tracking-widest text-white transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 shadow-md"
                 style={{ background: C.primary }}>
-                {esCargando 
-                  ? <><Loader2 size={16} className="animate-spin" style={{ color: C.accent }} /> Generando...</> 
-                  : <><Download size={16} style={{ color: C.accent }} /> Exportar Documento</>
-                }
+                {esCargando
+                  ? <><Loader2 size={16} className="animate-spin" style={{ color: C.accent }} /> Generando...</>
+                  : <><Download size={16} style={{ color: C.accent }} /> Exportar Documento</>}
               </button>
             </div>
           )
         })}
       </div>
 
-      {/* HISTORIAL DE REPORTES GENERADOS */}
+      {/* HISTORIAL */}
       <div className="bg-white rounded-[1.5rem] shadow-sm border border-emerald-50 overflow-hidden">
-        <div className="px-8 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(8,28,17,0.05)', background: '#F9FDFB' }}>
+        <div className="px-8 py-5 flex items-center gap-3"
+          style={{ borderBottom: '1px solid rgba(8,28,17,0.05)', background: '#F9FDFB' }}>
           <Calendar size={18} style={{ color: C.accentDark }} />
-          <h3 className="font-mono text-sm font-bold uppercase tracking-widest" style={{ color: C.primary, margin: 0 }}>Historial de Descargas</h3>
+          <h3 className="font-mono text-sm font-bold uppercase tracking-widest" style={{ color: C.primary, margin: 0 }}>
+            Historial de Descargas
+          </h3>
         </div>
-        
+
         {historial.length === 0 ? (
           <div className="p-12 text-center">
             <div className="w-16 h-16 bg-[#E8F8F1] rounded-full flex items-center justify-center mx-auto mb-4">
@@ -213,12 +257,20 @@ export default function ReportesPage() {
                     {h.titulo}
                   </div>
                   <div className="font-mono text-[11px] font-medium mt-1" style={{ color: C.textSecondary }}>
-                    {h.parametros?.total_registros != null ? <span className="font-bold text-emerald-700">{h.parametros.total_registros} registros analizados</span> : ''} 
+                    {h.parametros?.subtipo && (
+                      <span className="uppercase font-bold mr-2" style={{ color: C.accentDark }}>
+                        [{h.parametros.subtipo}]
+                      </span>
+                    )}
+                    {h.parametros?.total_registros != null && (
+                      <span className="font-bold text-emerald-700">{h.parametros.total_registros} registros</span>
+                    )}
                     {h.parametros?.total_registros != null && ' • '}
                     {formatFecha(h.fecha_generado)}
                   </div>
                 </div>
-                <span className="font-mono text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold shadow-sm" style={{ background: C.primary, color: C.white }}>
+                <span className="font-mono text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold shadow-sm"
+                  style={{ background: C.primary, color: C.white }}>
                   {h.formato?.toUpperCase() || 'PDF'}
                 </span>
               </div>

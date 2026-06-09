@@ -331,6 +331,9 @@ def _enriquecer_animal(animal: Animal, db: Session) -> AnimalResponse:
 
     r = AnimalResponse.model_validate(animal)
     r.total_mediciones = total or 0
+    if animal.hato_id:                                              # ← NUEVO
+        hato = db.query(Hato).filter(Hato.id == animal.hato_id).first()  # ← NUEVO
+        r.hato_nombre = hato.nombre if hato else None 
     if ultima:
         r.ultima_medicion = ultima.fecha_medicion
         r.ultimo_peso_kg  = ultima.peso_estimado_kg
