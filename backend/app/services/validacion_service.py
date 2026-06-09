@@ -1,15 +1,18 @@
 """
-validacion_service.py  — versión ONNX (bajo consumo de RAM)
-─────────────────────────────────────────────────────────────
-Usa onnxruntime en vez de ultralytics YOLO (~20 MB vs ~80 MB RAM).
-Detecta vacas (clase 19 COCO) con yolov8n.onnx para pre-validar encuadre.
-El modelo .onnx se exporta automáticamente si no existe.
+validacion_service.py  — v7.1 OpenCV + detección de silueta bovina
+────────────────────────────────────────────────────────────────────
+Sin modelo IA. Valida con OpenCV:
+  - Brillo y nitidez de la imagen
+  - Detección de silueta grande (animal real en el frame)
+  - Ratio de aspecto del bounding box (lateral vs trasera)
+  - Centrado horizontal (foto trasera)
+  - Para lateral: verifica que el bbox sea horizontal (más ancho que alto)
+  - Para trasera: verifica que el animal esté centrado
+0 MB RAM extra, respuesta <150ms.
 """
-
 import asyncio
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -17,15 +20,13 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # ── Umbrales ──────────────────────────────────────────────
-CONF_DETECCION_MIN = 0.45
-COBERTURA_LATERAL  = 0.25
-COBERTURA_TRASERA  = 0.20
-RATIO_LATERAL_MIN  = 1.15
-CENTRO_TOLERANCIA  = 0.30
-CLASE_VACA         = 19        # índice COCO para "cow"
-
-_MODEL_PATH = Path("yolov8n.onnx")
-_IMG_SIZE   = 640
+COBERTURA_MIN_LAT  = 0.18   # silueta ≥ 18% del frame (lateral)
+COBERTURA_MIN_TRA  = 0.12   # silueta ≥ 12% del frame (trasera)
+RATIO_LAT_MIN      = 1.05   # bbox más ancho que alto → vista lateral
+CENTRO_TOL         = 0.35   # animal centrado ± 35% del centro (trasera)
+BRILLO_MIN         = 25
+BRILLO_MAX         = 245
+NITIDEZ_MIN        = 35.0   # varianza laplaciana
 
 
 @dataclass
@@ -46,196 +47,158 @@ class ResultadoPar:
     par_valido: bool
 
 
-# ── Pre/post procesado YOLOv8 ONNX ───────────────────────
-def _preprocesar(img_bgr: np.ndarray, size: int = _IMG_SIZE):
-    h, w    = img_bgr.shape[:2]
-    escala  = size / max(h, w)
-    nw, nh  = int(w * escala), int(h * escala)
-    resized = cv2.resize(img_bgr, (nw, nh))
-    canvas  = np.full((size, size, 3), 114, dtype=np.uint8)
-    canvas[:nh, :nw] = resized
-    pad_w = (size - nw) / 2
-    pad_h = (size - nh) / 2
-    tensor = canvas[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) / 255.0
-    return tensor[np.newaxis], escala, pad_w, pad_h, w, h
+def _bytes_a_array(b: bytes) -> np.ndarray:
+    arr = np.frombuffer(b, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("No se pudo decodificar la imagen.")
+    return img
 
 
-def _postprocesar(output, escala, pad_w, pad_h, orig_w, orig_h, conf_umbral=0.25):
-    preds = output[0]
-    if preds.shape[0] == 84:
-        preds = preds.T
-    cx, cy, bw, bh = preds[:, 0], preds[:, 1], preds[:, 2], preds[:, 3]
-    cls_scores = preds[:, 4:]
-    cls_ids    = cls_scores.argmax(axis=1)
-    confs      = cls_scores.max(axis=1)
-    mask = confs >= conf_umbral
-    if not mask.any():
-        return []
-    cx, cy, bw, bh = cx[mask], cy[mask], bw[mask], bh[mask]
-    confs   = confs[mask]
-    cls_ids = cls_ids[mask]
-    x1 = ((cx - bw/2 - pad_w) / escala).clip(0, orig_w)
-    x2 = ((cx + bw/2 - pad_w) / escala).clip(0, orig_w)
-    y1 = ((cy - bh/2 - pad_h) / escala).clip(0, orig_h)
-    y2 = ((cy + bh/2 - pad_h) / escala).clip(0, orig_h)
-    return _nms(list(zip(confs, x1, y1, x2, y2, cls_ids)))
+def _detectar_silueta(img: np.ndarray):
+    """
+    Detecta la silueta más grande de la imagen con OpenCV.
+    Retorna (cobertura, ratio_bbox, centro_x_rel) o None si no hay silueta.
+    """
+    h, w  = img.shape[:2]
+    gris  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Reducir ruido
+    blur  = cv2.GaussianBlur(gris, (7, 7), 0)
+
+    # Umbral adaptativo — funciona bien con distintas iluminaciones
+    thresh = cv2.adaptiveThreshold(
+        blur, 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV, 31, 8
+    )
+
+    # Morfología para unir partes del animal
+    k1 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+    k2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (25, 25))
+    cerrado = cv2.morphologyEx(thresh,  cv2.MORPH_CLOSE, k1)
+    cerrado = cv2.morphologyEx(cerrado, cv2.MORPH_DILATE, k2)
+
+    cnts, _ = cv2.findContours(cerrado, cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)
+    if not cnts:
+        return None
+
+    # Contorno más grande — ignorar ruido pequeño (< 1% del frame)
+    mayor = max(cnts, key=cv2.contourArea)
+    area  = cv2.contourArea(mayor)
+    if area < 0.01 * w * h:
+        return None
+
+    x, y, bw, bh = cv2.boundingRect(mayor)
+    cobertura = area / (w * h)
+    ratio     = bw / bh if bh > 0 else 1.0
+    centro_x  = (x + bw / 2) / w   # 0=izquierda, 1=derecha, 0.5=centro
+
+    return cobertura, ratio, centro_x
 
 
-def _nms(dets, iou_thresh=0.45):
-    if not dets:
-        return []
-    dets = sorted(dets, key=lambda d: d[0], reverse=True)
-    resultado = []
-    while dets:
-        best = dets.pop(0)
-        resultado.append(best)
-        dets = [d for d in dets if _iou(best, d) < iou_thresh]
-    return resultado
+def _calidad_basica(img: np.ndarray, vista: str):
+    """Verifica brillo y nitidez. Retorna (ok, motivo, sugerencia)."""
+    gris    = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    brillo  = float(np.mean(gris))
+    nitidez = float(cv2.Laplacian(gris, cv2.CV_64F).var())
+
+    if brillo < BRILLO_MIN:
+        return False, f"La foto {vista} está muy oscura (brillo {brillo:.0f}).", \
+               "Toma la foto con luz natural difusa o en un lugar bien iluminado."
+    if brillo > BRILLO_MAX:
+        return False, f"La foto {vista} está sobreexpuesta (brillo {brillo:.0f}).", \
+               "Evita apuntar el lente hacia fuentes de luz directa."
+    if nitidez < NITIDEZ_MIN:
+        return False, f"La foto {vista} está borrosa (nitidez {nitidez:.0f}).", \
+               "Mantén el teléfono quieto y espera a que enfoque antes de tomar la foto."
+    return True, "", ""
 
 
-def _iou(a, b):
-    ix1, iy1 = max(a[1], b[1]), max(a[2], b[2])
-    ix2, iy2 = min(a[3], b[3]), min(a[4], b[4])
-    inter = max(0, ix2-ix1) * max(0, iy2-iy1)
-    ua = (a[3]-a[1])*(a[4]-a[2]) + (b[3]-b[1])*(b[4]-b[2]) - inter
-    return inter / ua if ua > 0 else 0.0
+def _validar_lateral(img: np.ndarray) -> ResultadoFoto:
+    # 1. Calidad básica
+    ok, motivo, sug = _calidad_basica(img, "lateral")
+    if not ok:
+        return ResultadoFoto(False, False, 0.0, 0.0, False, motivo, sug)
+
+    # 2. Detección de silueta
+    sil = _detectar_silueta(img)
+    if sil is None:
+        return ResultadoFoto(False, False, 0.0, 0.0, False,
+                             "No se detectó un animal en la foto lateral.",
+                             "Asegúrate de que la vaca esté completamente visible a 2-4 metros.")
+
+    cobertura, ratio, centro_x = sil
+
+    # 3. Cobertura mínima
+    if cobertura < COBERTURA_MIN_LAT:
+        return ResultadoFoto(False, True, 0.7, round(cobertura, 3), False,
+                             f"La vaca ocupa muy poco del encuadre ({cobertura:.0%}).",
+                             "Acércate más al animal o centra el encuadre.")
+
+    # 4. Ratio — para perfil lateral el bbox debe ser más ancho que alto
+    if ratio < RATIO_LAT_MIN:
+        return ResultadoFoto(False, True, 0.7, round(cobertura, 3), False,
+                             f"La foto no parece un perfil lateral (ratio ancho/alto = {ratio:.2f}).",
+                             "Colócate exactamente de costado para capturar el perfil completo.")
+
+    confianza = min(0.95, 0.60 + cobertura * 0.5 + (ratio - 1.0) * 0.1)
+    return ResultadoFoto(True, True, round(confianza, 2), round(cobertura, 3), True,
+                         f"Foto lateral apta (cobertura {cobertura:.0%}, ratio {ratio:.2f}).", "")
 
 
-# ── Servicio ──────────────────────────────────────────────
+def _validar_trasera(img: np.ndarray) -> ResultadoFoto:
+    # 1. Calidad básica
+    ok, motivo, sug = _calidad_basica(img, "trasera")
+    if not ok:
+        return ResultadoFoto(False, False, 0.0, 0.0, False, motivo, sug)
+
+    # 2. Detección de silueta
+    sil = _detectar_silueta(img)
+    if sil is None:
+        return ResultadoFoto(False, False, 0.0, 0.0, False,
+                             "No se detectó un animal en la foto trasera.",
+                             "Colócate exactamente detrás de la vaca con la grupa centrada.")
+
+    cobertura, ratio, centro_x = sil
+
+    # 3. Cobertura mínima
+    if cobertura < COBERTURA_MIN_TRA:
+        return ResultadoFoto(False, True, 0.7, round(cobertura, 3), False,
+                             f"La vaca ocupa muy poco del encuadre ({cobertura:.0%}).",
+                             "Acércate más para que la grupa ocupe el frame.")
+
+    # 4. Centrado — la silueta debe estar cerca del centro horizontal
+    lim_inf = 0.5 - CENTRO_TOL
+    lim_sup = 0.5 + CENTRO_TOL
+    if not (lim_inf <= centro_x <= lim_sup):
+        return ResultadoFoto(False, True, 0.7, round(cobertura, 3), False,
+                             f"La vaca no está centrada horizontalmente ({centro_x:.0%} del ancho).",
+                             "Centra la grupa en el encuadre y dispara desde atrás.")
+
+    confianza = min(0.95, 0.60 + cobertura * 0.5)
+    return ResultadoFoto(True, True, round(confianza, 2), round(cobertura, 3), True,
+                         f"Foto trasera apta (cobertura {cobertura:.0%}, centrado {centro_x:.0%}).", "")
+
+
 class ValidacionService:
+    """Validación con OpenCV puro — 0 MB RAM extra, <150 ms."""
 
-    def __init__(self):
-        self._session     = None
-        self._input_name  = None
-
-    def _cargar_modelo(self):
-        if self._session is not None:
-            return self._session
-        try:
-            import onnxruntime as ort
-
-            if not _MODEL_PATH.exists():
-                logger.info("Exportando yolov8n.onnx desde ultralytics…")
-                from ultralytics import YOLO
-                YOLO("yolov8n.pt").export(format="onnx", imgsz=640, simplify=True)
-
-            opts = ort.SessionOptions()
-            opts.intra_op_num_threads = 1
-            opts.inter_op_num_threads = 1
-            self._session    = ort.InferenceSession(
-                str(_MODEL_PATH),
-                sess_options=opts,
-                providers=["CPUExecutionProvider"],
-            )
-            self._input_name = self._session.get_inputs()[0].name
-            logger.info("yolov8n.onnx cargado con onnxruntime (~20 MB RAM)")
-        except Exception as e:
-            logger.error("No se pudo cargar yolov8n.onnx: %s", e)
-            self._session = None
-        return self._session
-
-    @staticmethod
-    def _bytes_a_array(imagen_bytes: bytes) -> np.ndarray:
-        arr = np.frombuffer(imagen_bytes, dtype=np.uint8)
-        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError("No se pudo decodificar la imagen.")
-        return img
-
-    def _detectar_vaca(self, img: np.ndarray):
-        session = self._cargar_modelo()
-        if session is None:
-            return None
-        tensor, escala, pw, ph, ow, oh = _preprocesar(img)
-        output = session.run(None, {self._input_name: tensor})
-        dets   = _postprocesar(output[0], escala, pw, ph, ow, oh)
-        vacas  = [(c, x1, y1, x2, y2)
-                  for c, x1, y1, x2, y2, cls in dets
-                  if int(cls) == CLASE_VACA]
-        return max(vacas, key=lambda d: d[0]) if vacas else None
-
-    def _validar_lateral(self, img: np.ndarray) -> ResultadoFoto:
-        h_img, w_img = img.shape[:2]
-        area_img     = h_img * w_img
-        try:
-            det = self._detectar_vaca(img)
-        except Exception as e:
-            logger.error("Error inferencia lateral: %s", e)
-            return ResultadoFoto(False, False, 0.0, 0.0, False,
-                                 "Error interno al analizar la imagen.",
-                                 "Intenta nuevamente con otra fotografía.")
-
-        if det is None or det[0] < CONF_DETECCION_MIN:
-            conf = det[0] if det else 0.0
-            return ResultadoFoto(False, False, round(conf, 3), 0.0, False,
-                                 f"No se detectó un bovino en la foto lateral (confianza {conf:.0%}).",
-                                 "Asegúrate de que la vaca esté completamente visible de perfil, a 2-4 metros.")
-
-        conf, x1, y1, x2, y2 = det
-        ancho     = x2 - x1
-        alto      = y2 - y1
-        cobertura = (ancho * alto) / area_img
-        ratio     = ancho / alto if alto > 0 else 0
-
-        if cobertura < COBERTURA_LATERAL:
-            return ResultadoFoto(False, True, round(conf, 3), round(cobertura, 3), False,
-                                 f"La vaca ocupa solo el {cobertura:.0%} (mínimo {COBERTURA_LATERAL:.0%}).",
-                                 "Acércate más o centra el encuadre.")
-        if ratio < RATIO_LATERAL_MIN:
-            return ResultadoFoto(False, True, round(conf, 3), round(cobertura, 3), False,
-                                 f"La postura no parece perfil lateral (ratio {ratio:.2f}).",
-                                 "Colócate exactamente de costado para capturar el perfil completo.")
-
-        return ResultadoFoto(True, True, round(conf, 3), round(cobertura, 3), True,
-                             f"Foto lateral apta (confianza {conf:.0%}, cobertura {cobertura:.0%}).", "")
-
-    def _validar_trasera(self, img: np.ndarray) -> ResultadoFoto:
-        h_img, w_img = img.shape[:2]
-        area_img     = h_img * w_img
-        try:
-            det = self._detectar_vaca(img)
-        except Exception as e:
-            logger.error("Error inferencia trasera: %s", e)
-            return ResultadoFoto(False, False, 0.0, 0.0, False,
-                                 "Error interno al analizar la imagen.",
-                                 "Intenta nuevamente con otra fotografía.")
-
-        if det is None or det[0] < CONF_DETECCION_MIN:
-            conf = det[0] if det else 0.0
-            return ResultadoFoto(False, False, round(conf, 3), 0.0, False,
-                                 f"No se detectó un bovino en la foto trasera (confianza {conf:.0%}).",
-                                 "Colócate exactamente detrás de la vaca con la grupa centrada.")
-
-        conf, x1, y1, x2, y2 = det
-        ancho     = x2 - x1
-        alto      = y2 - y1
-        cobertura = (ancho * alto) / area_img
-        centro_x  = ((x1 + x2) / 2) / w_img
-
-        if cobertura < COBERTURA_TRASERA:
-            return ResultadoFoto(False, True, round(conf, 3), round(cobertura, 3), False,
-                                 f"La vaca ocupa solo el {cobertura:.0%} (mínimo {COBERTURA_TRASERA:.0%}).",
-                                 "Acércate más para que la grupa ocupe el frame.")
-
-        lim_inf = 0.5 - CENTRO_TOLERANCIA
-        lim_sup = 0.5 + CENTRO_TOLERANCIA
-        if not (lim_inf <= centro_x <= lim_sup):
-            return ResultadoFoto(False, True, round(conf, 3), round(cobertura, 3), False,
-                                 f"La vaca no está centrada (posición horizontal {centro_x:.0%}).",
-                                 "Centra la grupa en el encuadre y dispara desde atrás.")
-
-        return ResultadoFoto(True, True, round(conf, 3), round(cobertura, 3), True,
-                             f"Foto trasera apta (confianza {conf:.0%}, cobertura {cobertura:.0%}).", "")
-
-    async def validar_par(self, bytes_lateral: bytes, bytes_trasera: bytes) -> ResultadoPar:
+    async def validar_par(
+        self,
+        bytes_lateral: bytes,
+        bytes_trasera: bytes,
+    ) -> ResultadoPar:
         loop    = asyncio.get_event_loop()
-        img_lat = self._bytes_a_array(bytes_lateral)
-        img_tra = self._bytes_a_array(bytes_trasera)
+        img_lat = _bytes_a_array(bytes_lateral)
+        img_tra = _bytes_a_array(bytes_trasera)
 
         def procesar():
-            return self._validar_lateral(img_lat), self._validar_trasera(img_tra)
+            return _validar_lateral(img_lat), _validar_trasera(img_tra)
 
         res_lat, res_tra = await loop.run_in_executor(None, procesar)
+
         return ResultadoPar(
             lateral    = res_lat,
             trasera    = res_tra,
