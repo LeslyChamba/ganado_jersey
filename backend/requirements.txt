@@ -36,3 +36,7 @@ pydantic-settings==2.2.1
 
 # ─── Reportes ──────────────────────────────────────────
 reportlab==4.1.0
+
+passlib
+bcrypt==4.0.1
+PyJWT
