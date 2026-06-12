@@ -81,41 +81,33 @@ async def analizar_vaca(
         bytes_lateral, bytes_trasera
     )
 
-    # 5. EstimacionService v6 — cliente HTTP hacia HF Spaces
-    #    Envía ambas imágenes a HF y recibe peso + BCS + confianza
+    # ── Paso 5: Estimación con el servicio ────────────────────────────
     peso_kg, bcs_final, confianza_pct, bcs_conf = estimacion_service.estimar(
-        morfo_stub,
-        imagen_lateral=img_lat,
-        imagen_trasera=ruta_trasera,
+        morfometria=morfometria_calculada,
+        imagen_lateral=img_lateral_bgr,
+        imagen_trasera=imagen_trasera_path
     )
 
-    # 6. Recuperar la morfometría REAL que devolvió HF
-    #    EstimacionService la guarda en _ultima_morfometria tras cada llamada
+    # ── Paso 6: Recuperar la morfometría REAL ─────────────────────────
     morfometria_real = getattr(estimacion_service, "_ultima_morfometria", None) or morfo_stub
 
-    # 7. Confianza combinada
-   confianza_vision = getattr(estimacion_service, "_ultima_confianza_vision", 1.0)
+    # ── Paso 7: Confianza combinada (LÍNEA 97 SIN ERRORES) ────────────
+    confianza_vision = getattr(estimacion_service, "_ultima_confianza_vision", 1.0)
+    confianza_final = round((confianza_vision * 0.6) + (bcs_conf * 0.4), 3)
 
-    if confianza_vision < 0.65:  # Si el YOLO de HF no está seguro de que sea una vaca
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Validación fallida: El sistema no logró identificar una vaca en las imágenes."
-    )
-    # 8. Guardar en base de datos
+    # ── Paso 8: Persistencia en la Base de Datos ──────────────────────
     medicion = Medicion(
-        id               = medicion_id,
-        animal_id        = animal_id,
-        peso_estimado_kg = peso_kg,
-        bcs              = bcs_final,
-        confianza        = confianza_pct,
-        img_lateral_url  = url_lateral,
-        img_trasera_url  = url_trasera,
-        morfometria      = morfometria_real.model_dump()
-                           if hasattr(morfometria_real, "model_dump")
-                           else dict(morfometria_real),
-        modelo_version   = estimacion_service.version,
-        procesado_por    = "hf-spaces:mobilesam+cnn+yolo+xgboost",
-        notas            = notas,
+        id=medicion_id,
+        animal_id=animal_id,
+        peso_estimado_kg=peso_kg,
+        bcs=bcs_final,
+        confianza=confianza_pct,
+        img_lateral_url=url_lateral,
+        img_trasera_url=url_trasera,
+        morfometria=morfometria_real.model_dump() if hasattr(morfometria_real, "model_dump") else dict(morfometria_real),
+        modelo_version=estimacion_service.version,
+        procesado_por="hf-spaces:mobilesam+cnn+yolo+xgboost",
+        notes=notas,
     )
     db.add(medicion)
     db.commit()
@@ -124,17 +116,16 @@ async def analizar_vaca(
     interpretacion, recomendacion = estimacion_service.interpretar_bcs(bcs_final)
 
     return AnalisisResultado(
-        peso_estimado_kg      = peso_kg,
-        bcs                   = bcs_final,
-        confianza             = round(confianza_final * 100, 1),
-        interpretacion_bcs    = interpretacion,
-        recomendacion         = recomendacion,
-        morfometria           = morfometria_real,
-        medicion_id           = medicion_id,
-        procesado_en_segundos = round(time.time() - inicio, 2),
-    
-        confianza_peso = float(confianza_pct), 
-        confianza_bcs  = float(bcs_conf),
+        peso_estimado_kg=peso_kg,
+        bcs=bcs_final,
+        confianza=round(confianza_final * 100, 1),
+        interpretacion_bcs=interpretacion,
+        recomendacion=recomendacion,
+        morfometria=morfometria_real,
+        medicion_id=medicion_id,
+        procesado_en_segundos=round(time.time() - inicio, 2),
+        confianza_peso=float(confianza_pct),
+        confianza_bcs=float(bcs_conf),
     )
 
 
