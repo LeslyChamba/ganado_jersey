@@ -49,6 +49,13 @@ async def validar_fotos(
 
     resultado = await validacion_service.validar_par(bytes_lateral, bytes_trasera)
 
+    if not resultado.par_valido:
+        # Buscamos cuál falló para dar un detalle claro
+        motivo_error = resultado.lateral.motivo if not resultado.lateral.es_valida else resultado.trasera.motivo
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Validación de imágenes fallida: {motivo_error}"
+        )
     return ValidacionResponse(
         lateral=FotoResultado(**resultado.lateral.__dict__),
         trasera=FotoResultado(**resultado.trasera.__dict__),

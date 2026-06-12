@@ -801,28 +801,67 @@ export default function AnalisisPage() {
   const handleValidarFotos = async () => {
     if (!imgLateral) return toast.error('Necesitas la foto lateral primero')
     if (!imgTrasera) return toast.error('Necesitas la foto trasera primero')
+    
     const [calLat, calTra] = await Promise.all([
       validarCalidadLocal(imgLateral), validarCalidadLocal(imgTrasera),
     ])
+    
     if (!calLat.ok) return toast.error(`Foto lateral: ${calLat.motivo}`, { duration: 5000 })
     if (!calTra.ok) return toast.error(`Foto trasera: ${calTra.motivo}`, { duration: 5000 })
-    setValidandoFotos(true); setValidacion(null)
+    
+    setValidandoFotos(true); 
+    setValidacion(null)
+    
     try {
       const [latComp, traComp] = await Promise.all([
         comprimirImagen(imgLateral), comprimirImagen(imgTrasera),
       ])
+      
       const fd = new FormData()
-      fd.append('imagen_lateral', latComp); fd.append('imagen_trasera', traComp)
+      fd.append('imagen_lateral', latComp)
+      fd.append('imagen_trasera', traComp)
+      
+      // Invocar el endpoint de validación en el servidor
       const res = await analisisApi.validar(fd)
+      
+      // SI LLEGA AQUÍ: El backend respondió 200 OK (Pasó el escudo perfectamente)
       setValidacion(res.data)
-      if (res.data.par_valido)
-        toast.success('Ambas fotos son aptas para el análisis', { icon: '✅' })
-      else
-        toast.error('Una o ambas fotos necesitan corrección', { icon: '⚠️', duration: 4000 })
+      toast.success('Ambas fotos son aptas para el análisis', { icon: '✅' })
+      
     } catch (err) {
-      console.error('Error al validar fotos:', err)
-      toast.error('Error al validar las fotos', { icon: '❌' })
-    } finally { setValidandoFotos(false) }
+      console.error('Error en el escudo de validación:', err)
+      
+      // 🛑 CAPTURAMOS EL ERROR 400 DEL ESCUDO DE IA
+      if (err.response && err.response.status === 400) {
+        const mensajeIA = err.response.data?.detail || 'Una o ambas fotos necesitan corrección';
+        
+        // Lanzamos la notificación flotante
+        toast.error(mensajeIA, { icon: '⚠️', duration: 5000 })
+        
+        // 🔥 MEJORA DE UX: Alimentamos las tarjetas de validación con el error de la IA
+        setValidacion({
+          par_valido: false,
+          lateral: {
+            es_valida: false,
+            animal_detectado: false,
+            motivo: mensajeIA,
+            sugerencia: "Por favor, asegúrese de capturar la silueta completa de la vaca Jersey según la guía."
+          },
+          trasera: {
+            es_valida: false,
+            animal_detectado: false,
+            motivo: mensajeIA,
+            sugerencia: "Verifique que la grupa esté centrada y que el lente de la cámara esté limpio."
+          }
+        })
+      } else {
+        // Errores genéricos de red o caída de servidor
+        toast.error('Error de comunicación con el motor de validación', { icon: '❌' })
+        setValidacion(null)
+      }
+    } finally { 
+      setValidandoFotos(false) 
+    }
   }
 
   const handleSubmit = async (e) => {

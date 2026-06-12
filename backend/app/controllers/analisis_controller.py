@@ -94,9 +94,13 @@ async def analizar_vaca(
     morfometria_real = getattr(estimacion_service, "_ultima_morfometria", None) or morfo_stub
 
     # 7. Confianza combinada
-    confianza_vision = getattr(estimacion_service, "_ultima_confianza_vision", 1.0)
-    confianza_final  = round((confianza_vision * 0.6) + (bcs_conf * 0.4), 3)
+   confianza_vision = getattr(estimacion_service, "_ultima_confianza_vision", 1.0)
 
+    if confianza_vision < 0.65:  # Si el YOLO de HF no está seguro de que sea una vaca
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Validación fallida: El sistema no logró identificar una vaca en las imágenes."
+    )
     # 8. Guardar en base de datos
     medicion = Medicion(
         id               = medicion_id,
