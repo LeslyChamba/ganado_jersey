@@ -75,16 +75,20 @@ async def analizar_vaca(
     ext_trasera  = imagen_trasera.content_type.split("/")[-1].replace("jpeg", "jpg")
     ruta_trasera = str(Path(settings.UPLOAD_DIR) / str(medicion_id) / f"trasera.{ext_trasera}")
 
-    # 4. VisionService v6 stub — solo decodifica, no corre SAM
-    #    La morfometría real vendrá del JSON de HF en el paso 5
-    morfo_stub, img_lat, _ = await vision_service.analizar_imagenes(
-        bytes_lateral, bytes_trasera
-    )
+    # ── Paso 4.5: Decodificar imagen lateral a BGR para la CNN (BLINDAJE) ──
+    import cv2
+    import numpy as np
 
-    # ── Paso 5: Estimación con el servicio (CORREGIDO NOMBRE DE VARIABLE) ──
+    # Reseteamos el puntero del archivo por si otro servicio (como vision_service) ya lo leyó
+    imagen_lateral.file.seek(0)  
+    bytes_lateral = await imagen_lateral.read()
+    nparr_lat = np.frombuffer(bytes_lateral, np.uint8)
+    img_lateral_bgr = cv2.imdecode(nparr_lat, cv2.IMREAD_COLOR)
+
+    # ── Paso 5: Estimación con el servicio (AHORA SÍ TIENE LA VARIABLE) ──
     peso_kg, bcs_final, confianza_pct, bcs_conf = estimacion_service.estimar(
-        morfometria=morfo_stub,  # 🔗 Conexión corregida con tu vision_service
-        imagen_lateral=img_lateral_bgr,
+        morfometria=morfo_stub,
+        imagen_lateral=img_lateral_bgr,  # El array decodificado que acabamos de crear
         imagen_trasera=imagen_trasera_path
     )
 
@@ -127,7 +131,7 @@ async def analizar_vaca(
         confianza_peso=float(confianza_pct),
         confianza_bcs=float(bcs_conf),
     )
-    
+
 @router.get("/medicion/{medicion_id}", response_model=MedicionResponse)
 def obtener_medicion(
     medicion_id:  uuid.UUID,
