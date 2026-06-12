@@ -1,19 +1,18 @@
 """
-analisis_controller.py  — v6.0
+analisis_controller.py  — v6.0 (Estabilizado)
 Adaptado para arquitectura distribuida (Render ↔ Hugging Face Spaces).
 
-CAMBIOS respecto a v5:
-  - EstimacionService.estimar() devuelve (peso, bcs, confianza_pct, bcs_conf)
-    igual que antes. Render no sabe ni le importa cómo HF calculó eso.
-  - La morfometría REAL ahora viene del JSON de HF.
-    Para acceder a ella, EstimacionService._ultima_morfometria se llena
-    como efecto secundario de la llamada a estimar().
-  - VisionService es un stub: solo decodifica, no corre SAM.
-  - El resto del flujo (guardar en DB, responder al frontend) es IDÉNTICO a v5.
+Flujo limpio libre de NameError y AttributeError:
+  - Inicializa morfo_stub directamente desde el esquema de Pydantic.
+  - Decodifica la imagen lateral a una matriz BGR compatible con la CNN.
+  - Sifona las rutas de archivos guardados correctamente hacia el estimador.
+  - Mapea las confianzas reales de la IA hacia el Frontend de React.
 """
 import uuid
 import time
 import aiofiles
+import cv2
+import numpy as np
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +30,7 @@ from app.core.config import settings
 router = APIRouter(prefix="/analisis", tags=["Análisis de Imágenes"])
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
+
 @router.post("/", response_model=AnalisisResultado, status_code=status.HTTP_201_CREATED)
 async def analizar_vaca(
     animal_id:      uuid.UUID     = Form(...),
@@ -42,7 +42,7 @@ async def analizar_vaca(
 ):
     inicio = time.time()
 
-    # 1. Verificar que el animal pertenece al usuario
+    # 1. Verificar que el animal pertenece al usuario autenticado
     animal = db.query(Animal).join(Hato).filter(
         Animal.id == animal_id,
         Hato.propietario_id == current_user.id,
@@ -50,7 +50,7 @@ async def analizar_vaca(
     if not animal:
         raise HTTPException(status_code=404, detail="Animal no encontrado")
 
-    # 2. Validar formato y tamaño
+    # 2. Validar formato y restricciones de tamaño de archivos
     for img, nombre in [(imagen_lateral, "lateral"), (imagen_trasera, "trasera")]:
         if img.content_type not in ALLOWED_TYPES:
             raise HTTPException(
@@ -63,14 +63,21 @@ async def analizar_vaca(
                 detail=f"Imagen {nombre}: demasiado grande (máx {settings.MAX_IMAGE_SIZE_BYTES // 1024 // 1024} MB).",
             )
 
+    # Lectura asíncrona de los flujos de bytes
     bytes_lateral = await imagen_lateral.read()
     bytes_trasera = await imagen_trasera.read()
 
-    # ── Tubería de Visión Stub ────────────────────────────────────────
-    # Ejecuta tu vision_service v6 para generar el log de inicialización
-    morfo_stub = await vision_service.procesar(bytes_lateral)
+    # ── Tubería de Visión Stub (Instanciación segura libre de AttributeError) ──
+    morfo_stub = MorfometriaData(
+        largo_corporal_cm=0.0,
+        alzada_cm=0.0,
+        perimetro_toracico_cm=0.0,
+        ancho_caderas_cm=0.0,
+        profundidad_toracica_cm=0.0,
+        longitud_grupa_cm=0.0
+    )
 
-    # 3. Guardar imágenes en disco (para historial)
+    # 3. Almacenamiento local de imágenes para auditoría e historial
     medicion_id  = uuid.uuid4()
     url_lateral  = await _guardar_imagen(bytes_lateral, medicion_id, "lateral", imagen_lateral.content_type)
     url_trasera  = await _guardar_imagen(bytes_trasera, medicion_id, "trasera", imagen_trasera.content_type)
@@ -78,30 +85,27 @@ async def analizar_vaca(
     ext_trasera  = imagen_trasera.content_type.split("/")[-1].replace("jpeg", "jpg")
     ruta_trasera = str(Path(settings.UPLOAD_DIR) / str(medicion_id) / f"trasera.{ext_trasera}")
 
-    # ── Paso 4.5: Decodificar imagen lateral a BGR para la CNN (BLINDAJE) ──
-    import cv2
-    import numpy as np
-
-    imagen_lateral.file.seek(0)  
-    bytes_lateral = await imagen_lateral.read()
-    nparr_lat = np.frombuffer(bytes_lateral, np.uint8)
+    # ── Paso 4.5: Decodificación de la imagen de perfil a matriz BGR para OpenCV ──
+    await imagen_lateral.seek(0)
+    bytes_lateral_recomp = await imagen_lateral.read()
+    nparr_lat = np.frombuffer(bytes_lateral_recomp, np.uint8)
     img_lateral_bgr = cv2.imdecode(nparr_lat, cv2.IMREAD_COLOR)
 
-    # ── Paso 5: Estimación con el servicio (VARIABLES CONECTADAS) ─────
+    # ── Paso 5: Ejecución del Motor de Inferencia Distribuido (Hugging Face) ──
     peso_kg, bcs_final, confianza_pct, bcs_conf = estimacion_service.estimar(
         morfometria=morfo_stub,
-        imagen_lateral=img_lateral_bgr,  
-        imagen_trasera=ruta_trasera  # 🎯 CORREGIDO: Mapeado a ruta_trasera
+        imagen_lateral=img_lateral_bgr,
+        imagen_trasera=ruta_trasera
     )
 
-    # ── Paso 6: Recuperar la morfometría REAL ─────────────────────────
+    # ── Paso 6: Recuperación de la Morfometría Real calculada por el Space ──
     morfometria_real = getattr(estimacion_service, "_ultima_morfometria", None) or morfo_stub
 
-    # ── Paso 7: Confianza combinada ───────────────────────────────────
+    # ── Paso 7: Consolidación de índices de confianza ──
     confianza_vision = getattr(estimacion_service, "_ultima_confianza_vision", 1.0)
     confianza_final = round((confianza_vision * 0.6) + (bcs_conf * 0.4), 3)
 
-    # ── Paso 8: Persistencia en la Base de Datos ──────────────────────
+    # ── Paso 8: Persistencia transaccional en PostgreSQL (Neon) ──
     medicion = Medicion(
         id=medicion_id,
         animal_id=animal_id,
@@ -113,7 +117,7 @@ async def analizar_vaca(
         morfometria=morfometria_real.model_dump() if hasattr(morfometria_real, "model_dump") else dict(morfometria_real),
         modelo_version=estimacion_service.version,
         procesado_por="hf-spaces:mobilesam+cnn+yolo+xgboost",
-        notas=notas,  # 🎯 CORREGIDO: Mapeado a la columna notas
+        notas=notas,
     )
     db.add(medicion)
     db.commit()
@@ -121,6 +125,7 @@ async def analizar_vaca(
 
     interpretacion, recomendacion = estimacion_service.interpretar_bcs(bcs_final)
 
+    # 9. Retorno estructurado hacia el cliente web
     return AnalisisResultado(
         peso_estimado_kg=peso_kg,
         bcs=bcs_final,
@@ -133,7 +138,8 @@ async def analizar_vaca(
         confianza_peso=float(confianza_pct),
         confianza_bcs=float(bcs_conf),
     )
-    
+
+
 @router.get("/medicion/{medicion_id}", response_model=MedicionResponse)
 def obtener_medicion(
     medicion_id:  uuid.UUID,
