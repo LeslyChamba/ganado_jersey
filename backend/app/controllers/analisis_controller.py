@@ -81,9 +81,9 @@ async def analizar_vaca(
         bytes_lateral, bytes_trasera
     )
 
-    # ── Paso 5: Estimación con el servicio ────────────────────────────
+    # ── Paso 5: Estimación con el servicio (CORREGIDO NOMBRE DE VARIABLE) ──
     peso_kg, bcs_final, confianza_pct, bcs_conf = estimacion_service.estimar(
-        morfometria=morfometria_calculada,
+        morfometria=morfo_stub,  # 🔗 Conexión corregida con tu vision_service
         imagen_lateral=img_lateral_bgr,
         imagen_trasera=imagen_trasera_path
     )
@@ -91,7 +91,7 @@ async def analizar_vaca(
     # ── Paso 6: Recuperar la morfometría REAL ─────────────────────────
     morfometria_real = getattr(estimacion_service, "_ultima_morfometria", None) or morfo_stub
 
-    # ── Paso 7: Confianza combinada (LÍNEA 97 SIN ERRORES) ────────────
+    # ── Paso 7: Confianza combinada ───────────────────────────────────
     confianza_vision = getattr(estimacion_service, "_ultima_confianza_vision", 1.0)
     confianza_final = round((confianza_vision * 0.6) + (bcs_conf * 0.4), 3)
 
@@ -127,8 +127,7 @@ async def analizar_vaca(
         confianza_peso=float(confianza_pct),
         confianza_bcs=float(bcs_conf),
     )
-
-
+    
 @router.get("/medicion/{medicion_id}", response_model=MedicionResponse)
 def obtener_medicion(
     medicion_id:  uuid.UUID,
