@@ -1,0 +1,42 @@
+# ─── requirements.txt  (Render — v6.0) ──────────────────
+# PyTorch, torchvision, timm, ultralytics, mobile_sam y xgboost
+# han sido ELIMINADOS de Render. Ahora viven en HF Spaces.
+# Esto reduce la RAM de Render de ~450 MB a ~120 MB.
+
+# ─── Web framework ───────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+aiofiles==23.2.1
+
+# ─── Base de datos ───────────────────────────────────────
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# ─── Auth / Seguridad ────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+# ─── Cliente HTTP para HF Spaces (NUEVO en v6) ───────────
+httpx==0.27.0          # llamadas al Motor de Inferencia
+
+# ─── Imagen (solo decodificación, sin IA) ────────────────
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+Pillow==10.3.0
+
+# ─── Email ───────────────────────────────────────────────
+emails==0.6
+
+# ─── Validación ──────────────────────────────────────────
+pydantic[email]==2.7.1
+pydantic-settings==2.2.1
+
+# ─── Reportes ──────────────────────────────────────────
+reportlab==4.1.0
+
+passlib
+bcrypt==4.0.1
+PyJWT
