@@ -31,7 +31,6 @@ from app.core.config import settings
 router = APIRouter(prefix="/analisis", tags=["Análisis de Imágenes"])
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
-
 @router.post("/", response_model=AnalisisResultado, status_code=status.HTTP_201_CREATED)
 async def analizar_vaca(
     animal_id:      uuid.UUID     = Form(...),
@@ -67,6 +66,10 @@ async def analizar_vaca(
     bytes_lateral = await imagen_lateral.read()
     bytes_trasera = await imagen_trasera.read()
 
+    # ── Tubería de Visión Stub ────────────────────────────────────────
+    # Ejecuta tu vision_service v6 para generar el log de inicialización
+    morfo_stub = await vision_service.procesar(bytes_lateral)
+
     # 3. Guardar imágenes en disco (para historial)
     medicion_id  = uuid.uuid4()
     url_lateral  = await _guardar_imagen(bytes_lateral, medicion_id, "lateral", imagen_lateral.content_type)
@@ -79,17 +82,16 @@ async def analizar_vaca(
     import cv2
     import numpy as np
 
-    # Reseteamos el puntero del archivo por si otro servicio (como vision_service) ya lo leyó
     imagen_lateral.file.seek(0)  
     bytes_lateral = await imagen_lateral.read()
     nparr_lat = np.frombuffer(bytes_lateral, np.uint8)
     img_lateral_bgr = cv2.imdecode(nparr_lat, cv2.IMREAD_COLOR)
 
-    # ── Paso 5: Estimación con el servicio (AHORA SÍ TIENE LA VARIABLE) ──
+    # ── Paso 5: Estimación con el servicio (VARIABLES CONECTADAS) ─────
     peso_kg, bcs_final, confianza_pct, bcs_conf = estimacion_service.estimar(
         morfometria=morfo_stub,
-        imagen_lateral=img_lateral_bgr,  # El array decodificado que acabamos de crear
-        imagen_trasera=imagen_trasera_path
+        imagen_lateral=img_lateral_bgr,  
+        imagen_trasera=ruta_trasera  # 🎯 CORREGIDO: Mapeado a ruta_trasera
     )
 
     # ── Paso 6: Recuperar la morfometría REAL ─────────────────────────
@@ -111,7 +113,7 @@ async def analizar_vaca(
         morfometria=morfometria_real.model_dump() if hasattr(morfometria_real, "model_dump") else dict(morfometria_real),
         modelo_version=estimacion_service.version,
         procesado_por="hf-spaces:mobilesam+cnn+yolo+xgboost",
-        notes=notas,
+        notas=notas,  # 🎯 CORREGIDO: Mapeado a la columna notas
     )
     db.add(medicion)
     db.commit()
@@ -131,7 +133,7 @@ async def analizar_vaca(
         confianza_peso=float(confianza_pct),
         confianza_bcs=float(bcs_conf),
     )
-
+    
 @router.get("/medicion/{medicion_id}", response_model=MedicionResponse)
 def obtener_medicion(
     medicion_id:  uuid.UUID,
