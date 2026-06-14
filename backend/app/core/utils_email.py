@@ -1,100 +1,64 @@
-import socket
-import smtplib
 import logging
-from email.message import EmailMessage
+import resend
 
 logger = logging.getLogger(__name__)
 
 # =====================================================================
-# 🔐 CONFIGURACIÓN DE CORREO
+# 🔐 CONFIGURACIÓN DE CORREO — Resend (reemplaza SMTP bloqueado en Render)
 # =====================================================================
-EMAIL_SISTEMA = "lesly15chamba@gmail.com" 
-PASSWORD_APP = "fyrl hrjj avfq ighb"  # Contraseña de aplicación de 16 letras de Google
+RESEND_API_KEY = "re_JGvwaJqm_8Yjki3Gn8fAEw9zp6MNki57v"  
+EMAIL_SISTEMA  = "onboarding@resend.dev"  # ← usa este mientras no tengas dominio propio
+
+resend.api_key = RESEND_API_KEY
 
 
-def _obtener_ip_v4_gmail():
-    """
-    Fuerza la resolución de smtp.gmail.com a IPv4 para evadir el bug 
-    de enrutamiento IPv6 interno de la capa gratuita de Render.
-    """
+def enviar_correo_bienvenida(email_destino: str, nombre: str, password_generada: str) -> bool:
     try:
-        return socket.gethostbyname('smtp.gmail.com')
-    except Exception:
-        return 'smtp.gmail.com'
+        resend.Emails.send({
+            "from":    EMAIL_SISTEMA,
+            "to":      [email_destino],
+            "subject": "Bienvenido a JER-WEIGHT - Credenciales de Acceso",
+            "text": f"""Hola {nombre},
 
+El administrador te ha registrado en el sistema de gestión ganadera JER-WEIGHT.
 
-def enviar_correo_bienvenida(email_destino: str, nombre: str, password_generada: str):
-    """
-    Envía un correo automático de bienvenida al nuevo usuario con sus credenciales.
-    """
-    msg = EmailMessage()
-    msg['Subject'] = 'Bienvenido a JER-WEIGHT - Credenciales de Acceso'
-    msg['From'] = EMAIL_SISTEMA
-    msg['To'] = email_destino
+Tus credenciales de acceso son:
+Usuario: {email_destino}
+Contraseña: {password_generada}
 
-    contenido = f"""
-    Hola {nombre},
-    
-    El administrador te ha registrado en el sistema de gestión ganadera JER-WEIGHT.
-    
-    Tus credenciales de acceso son:
-    Usuario: {email_destino}
-    Contraseña: {password_generada}
-    
-    Por favor, ingresa al sistema y recuerda no compartir esta información.
-    
-    Saludos,
-    Equipo JER-WEIGHT
-    """
-    msg.set_content(contenido)
+Por favor, ingresa al sistema y recuerda no compartir esta información.
 
-    try:
-        ip_gmail = _obtener_ip_v4_gmail()
-        with smtplib.SMTP(ip_gmail, 587, timeout=10) as smtp:
-            smtp.starttls()  # Cifrado obligatorio compatible con Render
-            smtp.login(EMAIL_SISTEMA, PASSWORD_APP)
-            smtp.send_message(msg)
-        logger.info(f"✅ Correo de bienvenida enviado exitosamente a {email_destino}")
+Saludos,
+Equipo JER-WEIGHT"""
+        })
+        logger.info(f"✅ Correo de bienvenida enviado a {email_destino}")
         return True
     except Exception as e:
         logger.error(f"❌ Error al enviar correo de bienvenida: {e}")
         return False
 
 
-def enviar_correo_recuperacion(email_destino: str, token: str):
-    """
-    Envía el enlace seguro para el restablecimiento de contraseñas de usuarios.
-    """
-    msg = EmailMessage()
-    msg['Subject'] = 'Recuperación de Contraseña - JER-WEIGHT'
-    msg['From'] = EMAIL_SISTEMA
-    msg['To'] = email_destino
-
-    enlace_reset = f"https://ganado-jersey.vercel.app/reset-password?token={token}"
-
-    contenido = f"""
-    Hola,
-    
-    Has solicitado restablecer tu contraseña en el sistema JER-WEIGHT.
-    
-    Haz clic en el siguiente enlace para proceder con el cambio:
-    {enlace_reset}
-    
-    Si tú no solicitaste este cambio, puedes ignorar este mensaje de forma segura.
-    
-    Saludos,
-    Equipo JER-WEIGHT
-    """
-    msg.set_content(contenido)
-
+def enviar_correo_recuperacion(email_destino: str, token: str) -> bool:
+    enlace = f"https://ganado-jersey.vercel.app/reset-password?token={token}"
     try:
-        ip_gmail = _obtener_ip_v4_gmail()
-        with smtplib.SMTP(ip_gmail, 587, timeout=10) as smtp:
-            smtp.starttls()  # Cifrado obligatorio compatible con Render
-            smtp.login(EMAIL_SISTEMA, PASSWORD_APP)
-            smtp.send_message(msg)
-        logger.info(f"✅ Correo de recuperación enviado exitosamente a {email_destino}")
+        resend.Emails.send({
+            "from":    EMAIL_SISTEMA,
+            "to":      [email_destino],
+            "subject": "Recuperación de Contraseña - JER-WEIGHT",
+            "text": f"""Hola,
+
+Has solicitado restablecer tu contraseña en el sistema JER-WEIGHT.
+
+Haz clic en el siguiente enlace para proceder con el cambio:
+{enlace}
+
+Si tú no solicitaste este cambio, puedes ignorar este mensaje de forma segura.
+
+Saludos,
+Equipo JER-WEIGHT"""
+        })
+        logger.info(f"✅ Correo de recuperación enviado a {email_destino}")
         return True
     except Exception as e:
-        logger.error(f"❌ ERROR SMTP al recuperar contraseña: {e}")
+        logger.error(f"❌ ERROR al enviar correo de recuperación: {e}")
         return False

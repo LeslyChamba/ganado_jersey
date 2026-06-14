@@ -290,6 +290,7 @@ def eliminar_animal(
     current_user: Usuario = Depends(get_current_user)
 ):
     animal = _get_animal_o_404(animal_id, current_user.id, db)
+    db.query(Medicion).filter(Medicion.animal_id == animal_id).delete(synchronize_session=False)
     db.delete(animal)
     db.commit()
 

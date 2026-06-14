@@ -40,3 +40,6 @@ reportlab==4.1.0
 passlib
 bcrypt==4.0.1
 PyJWT
+
+# ─── Correo ──────────────────────────────────────────
+resend 
