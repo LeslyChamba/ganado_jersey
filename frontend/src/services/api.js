@@ -35,9 +35,12 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('usuario')
-      window.location.href = '/login'
+      const enLogin = window.location.pathname === '/login'
+      if (!enLogin) {  // ← solo redirigir si NO estás ya en login
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('usuario')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   }
