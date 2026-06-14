@@ -3,11 +3,11 @@ import { LayoutDashboard, Beef, FolderOpen, Scale, FileText, LogOut, Menu, Users
 import { useState } from 'react'
 import useAuthStore from '../../store/authStore'
 import clsx from 'clsx'
-
+import { PiCow } from 'react-icons/pi'
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/hatos',     icon: FolderOpen,      label: 'Hatos'     },
-  { to: '/vacas',     icon: Beef,            label: 'Vacas'     },
+  { to: '/vacas',     icon: PiCow,            label: 'Vacas'     },
   { to: '/analisis',  icon: Activity,        label: 'Medición'  },
   { to: '/reportes',  icon: FileText,        label: 'Reportes'  },
 ]
@@ -15,7 +15,7 @@ const nav = [
 const navAdmin = [
   { to: '/admin/usuarios',  icon: Users,  label: 'Usuarios'  },
   { to: '/admin/auditoria', icon: Shield, label: 'Auditoría' },
-  { to: '/admin/bovinos',   icon: Beef,   label: 'Bovinos'   }, 
+  { to: '/admin/bovinos',   icon: PiCow,   label: 'Bovinos'   }, 
 ]
 
 /* ── Tokens de color (Sincronizados con la marca) ── */
