@@ -4,9 +4,9 @@
 import { useEffect, useRef } from 'react'
 import { X, CheckCircle2, XCircle, Camera } from 'lucide-react'
 
-const IMG_LATERAL = '/img/guia_lateral.png'
-const IMG_TRASERA = '/img/guia_trasera.png'
-
+// Nuevos imports directos (Vite los detectará y empaquetará)
+import IMG_LATERAL from '../../img/guia_lateral.png'
+import IMG_TRASERA from '../../img/guia_trasera.png'
 const C = {
   primary:    '#081C11',
   accent:     '#52D9A0',
