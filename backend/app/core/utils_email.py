@@ -1,24 +1,38 @@
+import os 
 import logging
-import resend
+import requests
 
 logger = logging.getLogger(__name__)
 
-# =====================================================================
-# 🔐 CONFIGURACIÓN DE CORREO — Resend (reemplaza SMTP bloqueado en Render)
-# =====================================================================
-RESEND_API_KEY = "re_JGvwaJqm_8Yjki3Gn8fAEw9zp6MNki57v"  
-EMAIL_SISTEMA  = "onboarding@resend.dev"  # ← usa este mientras no tengas dominio propio
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+EMAIL_SISTEMA = "lesly15chamba@gmail.com"
+NOMBRE_SISTEMA = "JER-WEIGHT"
 
-resend.api_key = RESEND_API_KEY
+def _enviar_brevo(email_destino: str, nombre_destino: str, asunto: str, contenido: str) -> bool:
+    try:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key": BREVO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json={
+                "sender": {"name": NOMBRE_SISTEMA, "email": EMAIL_SISTEMA},
+                "to": [{"email": email_destino, "name": nombre_destino}],
+                "subject": asunto,
+                "textContent": contenido,
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error Brevo: {e}")
+        return False
 
 
 def enviar_correo_bienvenida(email_destino: str, nombre: str, password_generada: str) -> bool:
-    try:
-        resend.Emails.send({
-            "from":    EMAIL_SISTEMA,
-            "to":      [email_destino],
-            "subject": "Bienvenido a JER-WEIGHT - Credenciales de Acceso",
-            "text": f"""Hola {nombre},
+    contenido = f"""Hola {nombre},
 
 El administrador te ha registrado en el sistema de gestión ganadera JER-WEIGHT.
 
@@ -30,22 +44,15 @@ Por favor, ingresa al sistema y recuerda no compartir esta información.
 
 Saludos,
 Equipo JER-WEIGHT"""
-        })
+    ok = _enviar_brevo(email_destino, nombre, "Bienvenido a JER-WEIGHT - Credenciales de Acceso", contenido)
+    if ok:
         logger.info(f"✅ Correo de bienvenida enviado a {email_destino}")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Error al enviar correo de bienvenida: {e}")
-        return False
+    return ok
 
 
 def enviar_correo_recuperacion(email_destino: str, token: str) -> bool:
     enlace = f"https://ganado-jersey.vercel.app/reset-password?token={token}"
-    try:
-        resend.Emails.send({
-            "from":    EMAIL_SISTEMA,
-            "to":      [email_destino],
-            "subject": "Recuperación de Contraseña - JER-WEIGHT",
-            "text": f"""Hola,
+    contenido = f"""Hola,
 
 Has solicitado restablecer tu contraseña en el sistema JER-WEIGHT.
 
@@ -56,9 +63,7 @@ Si tú no solicitaste este cambio, puedes ignorar este mensaje de forma segura.
 
 Saludos,
 Equipo JER-WEIGHT"""
-        })
+    ok = _enviar_brevo(email_destino, "", "Recuperación de Contraseña - JER-WEIGHT", contenido)
+    if ok:
         logger.info(f"✅ Correo de recuperación enviado a {email_destino}")
-        return True
-    except Exception as e:
-        logger.error(f"❌ ERROR al enviar correo de recuperación: {e}")
-        return False
+    return ok
