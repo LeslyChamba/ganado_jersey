@@ -1,9 +1,11 @@
-// pages/GuiaCaptura.jsx
 // Modal con guía visual de captura de imágenes para el análisis bovino.
 // Uso: <GuiaCaptura open={open} onClose={() => setOpen(false)} />
 
 import { useEffect, useRef } from 'react'
 import { X, CheckCircle2, XCircle, Camera } from 'lucide-react'
+
+const IMG_LATERAL = '/img/guia_lateral.png'
+const IMG_TRASERA = '/img/guia_trasera.png'
 
 const C = {
   primary:    '#081C11',
@@ -14,57 +16,6 @@ const C = {
   card:       '#FFFFFF',
   border:     '#E0F4EC',
   bg:         '#F9FDFB',
-}
-
-// ── Silueta vaca lateral (SVG inline) ─────────────────────────────────────
-function SiluetaLateral({ size = 130 }) {
-  return (
-    <svg viewBox="0 0 320 190" width={size} height={size * 0.6} aria-hidden="true">
-      <rect x="15" y="15" width="290" height="160" rx="12"
-        fill="none" stroke={C.accent} strokeWidth="2" strokeDasharray="8,5" opacity="0.6"/>
-      <path d="M60 70 C70 50 110 45 150 45 S230 55 240 80 C250 110 245 140 210 150 S100 155 70 140 S50 100 60 70Z"
-        fill="rgba(82,217,160,0.15)" stroke={C.accent} strokeWidth="2.5"/>
-      <path d="M235 60 C245 40 275 35 290 50 S295 80 280 90 S245 85 235 60Z"
-        fill="rgba(82,217,160,0.1)" stroke={C.accent} strokeWidth="1.8"/>
-      <ellipse cx="285" cy="55" rx="3" ry="5" fill={C.accent} opacity="0.7"/>
-      <rect x="200" y="135" width="11" height="38" rx="3" fill="rgba(82,217,160,0.2)" stroke={C.accent} strokeWidth="1.6"/>
-      <rect x="217" y="132" width="11" height="38" rx="3" fill="rgba(82,217,160,0.2)" stroke={C.accent} strokeWidth="1.6"/>
-      <rect x="76" y="132" width="12" height="40" rx="3" fill="rgba(82,217,160,0.2)" stroke={C.accent} strokeWidth="1.6"/>
-      <rect x="95" y="135" width="12" height="40" rx="3" fill="rgba(82,217,160,0.2)" stroke={C.accent} strokeWidth="1.6"/>
-      <path d="M65 85 C50 80 45 100 48 120" stroke={C.accent} strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <line x1="235" y1="128" x2="65" y2="128" stroke="#3D6B9E" strokeWidth="1.8"/>
-      <circle cx="235" cy="128" r="2.5" fill="#3D6B9E"/>
-      <circle cx="65"  cy="128" r="2.5" fill="#3D6B9E"/>
-      <text x="150" y="140" textAnchor="middle" fill="#3D6B9E" fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">LC</text>
-      <line x1="190" y1="46" x2="190" y2="146" stroke="#C0392B" strokeWidth="1.8" strokeDasharray="4,2"/>
-      <text x="197" y="93" fill="#C0392B" fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">PT</text>
-      <text x="50" y="20" fill={C.accent} fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">2 – 4 m →</text>
-    </svg>
-  )
-}
-
-// ── Silueta vaca posterior (SVG inline) ────────────────────────────────────
-function SiluetaTrasera({ size = 100 }) {
-  return (
-    <svg viewBox="0 0 200 200" width={size} height={size} aria-hidden="true">
-      <ellipse cx="100" cy="90" rx="65" ry="60"
-        fill="rgba(82,217,160,0.12)" stroke={C.accent} strokeWidth="2.5"/>
-      <ellipse cx="62" cy="148" rx="13" ry="28"
-        fill="rgba(82,217,160,0.2)" stroke={C.accent} strokeWidth="1.8"/>
-      <ellipse cx="138" cy="148" rx="13" ry="28"
-        fill="rgba(82,217,160,0.2)" stroke={C.accent} strokeWidth="1.8"/>
-      <path d="M100 30 Q88 50 100 68 Q112 50 100 30"
-        fill="rgba(82,217,160,0.2)" stroke={C.accent} strokeWidth="1.6"/>
-      <line x1="100" y1="30" x2="100" y2="170"
-        stroke={C.accentDark} strokeWidth="1.2" strokeDasharray="3,3" opacity="0.5"/>
-      <line x1="35" y1="115" x2="165" y2="115"
-        stroke="#8B5CF6" strokeWidth="1.8"/>
-      <circle cx="35"  cy="115" r="3" fill="#8B5CF6"/>
-      <circle cx="165" cy="115" r="3" fill="#8B5CF6"/>
-      <text x="100" y="108" textAnchor="middle" fill="#8B5CF6" fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">AC</text>
-      <text x="100" y="185" textAnchor="middle" fill={C.accent} fontSize="9" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700">cola centrada</text>
-    </svg>
-  )
 }
 
 // ── Fila de requisito ──────────────────────────────────────────────────────
@@ -126,7 +77,7 @@ export default function GuiaCaptura({ open, onClose }) {
       <div
         className="relative w-full rounded-3xl shadow-2xl flex flex-col"
         style={{
-          maxWidth: 680,
+          maxWidth: 720,
           maxHeight: '92vh',
           background: C.card,
           border: `1.5px solid ${C.border}`,
@@ -164,52 +115,62 @@ export default function GuiaCaptura({ open, onClose }) {
 
           {/* 1 · Posición del animal */}
           <Seccion num="1" titulo="Posiciona el animal correctamente">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              
               {/* Lateral */}
-              <div className="rounded-xl p-4 flex flex-col items-center gap-3 border"
+              <div className="rounded-xl p-4 flex flex-col gap-3 border"
                 style={{ background: C.bg, borderColor: C.border }}>
-                <div className="font-mono text-[10px] font-bold uppercase tracking-wider self-start"
+                <div className="font-mono text-[10px] font-bold uppercase tracking-wider"
                   style={{ color: C.accentDark }}>Vista lateral — para peso</div>
-                <SiluetaLateral size={200} />
-                <div className="space-y-1.5 self-start w-full">
+                
+                {/* Contenedor de la Imagen Real */}
+                <div className="w-full h-44 overflow-hidden rounded-lg border bg-emerald-950/20 flex items-center justify-center group relative" style={{ borderColor: C.border }}>
+                  <img 
+                    src={IMG_LATERAL} 
+                    alt="Guía de encuadre lateral" 
+                    className="w-full h-full object-contain p-1 transition-transform duration-300 group-hover:scale-105"
+                    onError={(e) => { e.target.src = "https://placehold.co/400x300?text=Falta+Imagen+Lateral"; }}
+                  />
+                </div>
+
+                <div className="space-y-1.5 w-full mt-1">
                   <ReqRow ok>Perfil completo del animal visible</ReqRow>
                   <ReqRow ok>Las 4 patas visibles en el suelo</ReqRow>
                   <ReqRow ok>Distancia: 2 – 4 metros del flanco</ReqRow>
                   <ReqRow ok={false}>No captures en diagonal</ReqRow>
                 </div>
-                <div className="flex gap-3 mt-1 self-start">
-                  {[['#3D6B9E','LC largo'],['#C0392B','PT perímetro'],['#C8914A','AC alzada']].map(([c, l]) => (
-                    <div key={l} className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full" style={{ background: c }}/>
-                      <span className="font-mono text-[9px] font-bold uppercase" style={{ color: C.textSub }}>{l}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
 
               {/* Trasera */}
-              <div className="rounded-xl p-4 flex flex-col items-center gap-3 border"
+              <div className="rounded-xl p-4 flex flex-col gap-3 border"
                 style={{ background: C.bg, borderColor: C.border }}>
-                <div className="font-mono text-[10px] font-bold uppercase tracking-wider self-start"
+                <div className="font-mono text-[10px] font-bold uppercase tracking-wider"
                   style={{ color: '#7C3AED' }}>Vista posterior — para BCS</div>
-                <SiluetaTrasera size={130} />
-                <div className="space-y-1.5 self-start w-full">
+                
+                {/* Contenedor de la Imagen Real */}
+                <div className="w-full h-44 overflow-hidden rounded-lg border bg-emerald-950/20 flex items-center justify-center group relative" style={{ borderColor: C.border }}>
+                  <img 
+                    src={IMG_TRASERA} 
+                    alt="Guía de encuadre trasera" 
+                    className="w-full h-full object-contain p-1 transition-transform duration-300 group-hover:scale-105"
+                    onError={(e) => { e.target.src = "https://placehold.co/400x300?text=Falta+Imagen+Trasera"; }}
+                  />
+                </div>
+
+                <div className="space-y-1.5 w-full mt-1">
                   <ReqRow ok>Cola centrada, animal de frente</ReqRow>
                   <ReqRow ok>Grupa y caderas completamente visibles</ReqRow>
                   <ReqRow ok>Cámara a altura de la cadera del animal</ReqRow>
                   <ReqRow ok={false}>No captures en ángulo lateral</ReqRow>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 self-start">
-                  <div className="w-2 h-2 rounded-full" style={{ background: '#8B5CF6' }}/>
-                  <span className="font-mono text-[9px] font-bold uppercase" style={{ color: C.textSub }}>AC ancho cadera · BCS</span>
-                </div>
               </div>
+
             </div>
           </Seccion>
 
           {/* 2 · Condiciones */}
           <Seccion num="2" titulo="Condiciones de captura que afectan al modelo">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 {
                   titulo: 'Iluminación', color: '#FAEEDA', colorText: '#854F0B',
@@ -245,21 +206,21 @@ export default function GuiaCaptura({ open, onClose }) {
 
           {/* 3 · Requisitos del archivo */}
           <Seccion num="3" titulo="Requisitos del archivo de imagen">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
                 { label: 'Formatos aceptados', val: 'JPG · PNG · WEBP', ok: true },
                 { label: 'Resolución mínima',  val: '1280 × 720 px',   ok: true },
                 { label: 'Tamaño máximo',      val: '10 MB por foto',  ok: true },
                 { label: 'Sin filtros',         val: 'Foto original',   ok: true },
                 { label: 'Sin recortes',        val: 'Encuadre completo', ok: true },
-                { label: 'Sin metadatos alterados', val: 'Directo de cámara', ok: true },
+                { label: 'Sin metadatos',       val: 'Directo de cámara', ok: true },
               ].map(({ label, val, ok }) => (
-                <div key={label} className="rounded-xl p-3 border text-center"
+                <div key={label} className="rounded-xl p-3 border text-center flex flex-col justify-between"
                   style={{ background: C.bg, borderColor: C.border }}>
                   <div className="flex justify-center mb-1.5">
                     {ok
                       ? <CheckCircle2 size={16} style={{ color: C.accentDark }}/>
-                      : <XCircle      size={16} style={{ color: '#C0392B' }}/>
+                      : <XCircle       size={16} style={{ color: '#C0392B' }}/>
                     }
                   </div>
                   <p className="font-mono text-[9px] uppercase tracking-wider font-bold mb-0.5" style={{ color: C.textSub }}>{label}</p>
@@ -277,7 +238,7 @@ export default function GuiaCaptura({ open, onClose }) {
               <span style={{ color: C.primary, fontSize: 10, fontWeight: 800 }}>!</span>
             </div>
             <p className="text-sm leading-relaxed" style={{ color: C.primary }}>
-              <span className="font-bold">Consejo:</span> captura primero la foto lateral (el modelo de peso la necesita con luz pareja), luego pide a un ayudante que posicione el animal de frente para la foto trasera de BCS. Con dos fotos de buena calidad el pipeline entregará estimaciones con margen de error mínimo.
+              <span className="font-bold">Consejo:</span> captura primero la foto lateral (el modelo de peso la necesita con luz pareja), luego posiciona al animal para la foto trasera de BCS. Con dos fotos de buena calidad el pipeline entregará estimaciones con un margen de error mínimo.
             </p>
           </div>
         </div>

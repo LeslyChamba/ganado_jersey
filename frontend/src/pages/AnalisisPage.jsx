@@ -1239,7 +1239,7 @@ export default function AnalisisPage() {
                   className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-mono text-xs font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-lg"
                   style={{ background: C.primary, color: '#FFFFFF' }}>
                   <Scale size={18} style={{ color: validacion?.par_valido ? C.accent : 'rgba(255,255,255,0.4)' }} />
-                  Ejecutar Motor de Estimación
+                  Estimar masa y BCS
                 </button>
                 {(!validacion || !validacion.par_valido) && imgLateral && imgTrasera && (
                   <p className="text-center font-mono text-[10px] uppercase tracking-wider" style={{ color: C.textSub }}>
