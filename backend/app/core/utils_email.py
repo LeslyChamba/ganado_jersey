@@ -1,29 +1,34 @@
-import os 
+import os
 import logging
 import requests
 
 logger = logging.getLogger(__name__)
 
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
-EMAIL_SISTEMA = "lesly15chamba@gmail.com"
+# =====================================================================
+# 🔐 CONFIGURACIÓN DE CORREO — Brevo API REST
+# =====================================================================
+BREVO_API_KEY  = os.environ.get("BREVO_API_KEY", "")
+EMAIL_SISTEMA  = "lesly15chamba@gmail.com"
 NOMBRE_SISTEMA = "JER-WEIGHT"
+
 
 def _enviar_brevo(email_destino: str, nombre_destino: str, asunto: str, contenido: str) -> bool:
     try:
         response = requests.post(
             "https://api.brevo.com/v3/smtp/email",
             headers={
-                "api-key": BREVO_API_KEY,
+                "api-key":      BREVO_API_KEY,
                 "Content-Type": "application/json",
             },
             json={
                 "sender": {"name": NOMBRE_SISTEMA, "email": EMAIL_SISTEMA},
-                "to": [{"email": email_destino, "name": nombre_destino}],
-                "subject": asunto,
+                "to":     [{"email": email_destino, "name": nombre_destino}],
+                "subject":     asunto,
                 "textContent": contenido,
             },
             timeout=15,
         )
+        logger.info(f"Brevo response: {response.status_code} | {response.text}")
         response.raise_for_status()
         return True
     except Exception as e:
@@ -44,7 +49,13 @@ Por favor, ingresa al sistema y recuerda no compartir esta información.
 
 Saludos,
 Equipo JER-WEIGHT"""
-    ok = _enviar_brevo(email_destino, nombre, "Bienvenido a JER-WEIGHT - Credenciales de Acceso", contenido)
+
+    ok = _enviar_brevo(
+        email_destino,
+        nombre,
+        "Bienvenido a JER-WEIGHT - Credenciales de Acceso",
+        contenido,
+    )
     if ok:
         logger.info(f"✅ Correo de bienvenida enviado a {email_destino}")
     return ok
@@ -63,7 +74,13 @@ Si tú no solicitaste este cambio, puedes ignorar este mensaje de forma segura.
 
 Saludos,
 Equipo JER-WEIGHT"""
-    ok = _enviar_brevo(email_destino, "", "Recuperación de Contraseña - JER-WEIGHT", contenido)
+
+    ok = _enviar_brevo(
+        email_destino,
+        "Usuario",
+        "Recuperación de Contraseña - JER-WEIGHT",
+        contenido,
+    )
     if ok:
         logger.info(f"✅ Correo de recuperación enviado a {email_destino}")
     return ok
