@@ -102,9 +102,12 @@ async def analizar_vaca(
         Path(settings.UPLOAD_DIR) / str(medicion_id) / f"trasera.{ext_trasera}"
     )
 
-    # ── 4. Pipeline visión — SAM + BCS ────────────────────────────────────
-    # v4: retorna también img_lat (ndarray BGR) para el modelo CNN híbrido
-    morfometria, img_lat, confianza_vision, bcs, bcs_conf = \
+    # ── 4. Pipeline visión — SAM + morfometría ────────────────────────────
+    # v5.0: analizar_imagenes ya NO calcula BCS aquí (eso vive solo en
+    # EstimacionService, para no tener dos instancias de YOLO en RAM a la vez).
+    # Retorna 3 valores: morfo, img_lat (ndarray BGR para el CNN híbrido)
+    # y confianza_vision. El BCS final se obtiene en el paso 5.
+    morfometria, img_lat, confianza_vision = \
         await vision_service.analizar_imagenes(bytes_lateral, bytes_trasera)
 
     # ── 5. Estimación de peso — CNN híbrido (principal) + XGBoost (respaldo)
@@ -128,7 +131,7 @@ async def analizar_vaca(
         img_trasera_url  = url_trasera,
         morfometria      = morfometria.model_dump(),
         modelo_version   = estimacion_service.version,
-        procesado_por    = "sam+yolo+cnn_hibrido",  # ← actualizado
+        procesado_por    = "sam+yolo+cnn_hibrido",
         notas            = notas,
     )
     db.add(medicion)
