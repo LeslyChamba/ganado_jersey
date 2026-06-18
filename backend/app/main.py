@@ -1,6 +1,4 @@
-import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,14 +10,12 @@ from app.core.config import settings
 from app.db.database import engine, Base
 from app.controllers.admin_controller import router as admin_router
 from app.controllers.auth_controller import router as auth_router
-from app.controllers.animal_controller import router as animal_router
+from app.controllers.animal_controller import hato_router, animal_router
 from app.controllers.analisis_controller import router as analisis_router
-from app.controllers.validacion_controller import router as validacion_router  # ← AÑADIDO
 from app.controllers.reportes_controller import router as reporte_router
 from app.controllers.dashboard_controller import router as dashboard_router
 from app.controllers.bovinos_controller import router as bovinos_router
 from app.core.model_loader import descargar_modelos
-
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -31,23 +27,19 @@ logger = logging.getLogger("jer-weight")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Iniciando JER-WEIGHT v{settings.APP_VERSION}")
+         # ✅ Descargar modelos al arrancar
+    descargar_modelos()
+    if settings.ENVIRONMENT == "development":
+        # Solo como fallback rápido en dev — en producción usar: alembic upgrade head
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Tablas verificadas (dev mode)")
 
     Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
     logger.info(f"📁 Directorio de imágenes: {settings.UPLOAD_DIR}")
 
-    if settings.ENVIRONMENT == "development":
-        Base.metadata.create_all(bind=engine)
-        logger.info("✅ Tablas verificadas (dev mode)")
-
-    loop = asyncio.get_event_loop()
-    executor = ThreadPoolExecutor(max_workers=1)
-    loop.run_in_executor(executor, descargar_modelos)
-    logger.info("⏳ Modelos cargando en background...")
-
     yield
 
     logger.info("🛑 Apagando JER-WEIGHT...")
-
 
 app = FastAPI(
     title="JER-WEIGHT API",
@@ -64,10 +56,10 @@ mediante análisis de imágenes con visión por computadora.
 4. Obtén peso estimado y BCS al instante
 
 ### Tecnologías:
-- **Segmentación**: MobileSAM (vit_t)
-- **BCS**: YOLOv8 clasificación (foto trasera)
+- **Segmentación**: SAM (Segment Anything Model)
+- **BCS**: YOLOv8 (foto trasera)
 - **Morfometría**: OpenCV
-- **Estimación**: CNN híbrida EfficientNet-B0 + XGBoost respaldo
+- **Estimación**: XGBoost + Fórmula calibrada Jersey
     """,
     version=settings.APP_VERSION,
     docs_url="/docs",
@@ -75,32 +67,26 @@ mediante análisis de imágenes con visión por computadora.
     lifespan=lifespan,
 )
 
-# ── CORS ──────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS_LIST,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
 
 Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 API_PREFIX = "/api/v1"
-app.include_router(auth_router,        prefix=API_PREFIX)
-app.include_router(admin_router,       prefix=API_PREFIX)
-app.include_router(hato_router,        prefix=API_PREFIX)
-app.include_router(animal_router,      prefix=API_PREFIX)
-app.include_router(analisis_router,    prefix=API_PREFIX)
-app.include_router(validacion_router,  prefix=API_PREFIX)  # ← AÑADIDO
-app.include_router(reporte_router,     prefix=API_PREFIX)
-app.include_router(bovinos_router,     prefix=API_PREFIX)
-app.include_router(dashboard_router,   prefix=API_PREFIX)
-
-
-@app.get("/", tags=["Sistema"])
+app.include_router(auth_router,      prefix=API_PREFIX)
+app.include_router(admin_router,     prefix=API_PREFIX)
+app.include_router(hato_router,      prefix=API_PREFIX)
+app.include_router(animal_router,    prefix=API_PREFIX)
+app.include_router(analisis_router,  prefix=API_PREFIX)
+app.include_router(reporte_router,   prefix=API_PREFIX)
+app.include_router(bovinos_router, prefix=API_PREFIX)
+app.include_router(dashboard_router, prefix=API_PREFIX)
 def raiz():
     return {
         "sistema": "JER-WEIGHT",
@@ -130,9 +116,7 @@ def health_check():
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
     }
-
-
-@app.get("/api/v1/health", tags=["Sistema"])
+@app.get("/api/v1/health", tags=["Sistema"])  # ← agregar esta ruta
 def health_check_v1():
     from sqlalchemy import text
     from app.db.database import SessionLocal
