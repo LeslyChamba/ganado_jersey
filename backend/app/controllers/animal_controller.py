@@ -1,6 +1,4 @@
-import uuid
-import time
-import aiofiles
+import uuid, time, aiofiles
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, status
@@ -14,9 +12,8 @@ from app.services.validacion_service import validacion_service
 from app.controllers.auth_controller import get_current_user
 from app.core.config import settings
 
-# Definición estándar del router para que main.py lo importe correctamente
 router = APIRouter(prefix="/analisis", tags=["Análisis de Imágenes"])
-ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+ALLOWED_TYPES = {"image/jpeg","image/jpg","image/png","image/webp"}
 
 
 @router.post(
@@ -106,10 +103,12 @@ async def analizar_vaca(
     )
 
     # ── 4. Pipeline visión — SAM + BCS ────────────────────────────────────
+    # v4: retorna también img_lat (ndarray BGR) para el modelo CNN híbrido
     morfometria, img_lat, confianza_vision, bcs, bcs_conf = \
         await vision_service.analizar_imagenes(bytes_lateral, bytes_trasera)
 
     # ── 5. Estimación de peso — CNN híbrido (principal) + XGBoost (respaldo)
+    # img_lat se pasa directamente al CNN — no necesita guardarse en disco
     peso_kg, bcs_final, confianza_ml, confianza_bcs = estimacion_service.estimar(
         morfometria,
         imagen_lateral=img_lat,       # ← ndarray BGR para CNN híbrido
@@ -129,7 +128,7 @@ async def analizar_vaca(
         img_trasera_url  = url_trasera,
         morfometria      = morfometria.model_dump(),
         modelo_version   = estimacion_service.version,
-        procesado_por    = "sam+yolo+cnn_hibrido",
+        procesado_por    = "sam+yolo+cnn_hibrido",  # ← actualizado
         notas            = notas,
     )
     db.add(medicion)
