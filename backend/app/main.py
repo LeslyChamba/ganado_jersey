@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.db.database import engine, Base
 from app.controllers.admin_controller import router as admin_router
 from app.controllers.auth_controller import router as auth_router
-from app.controllers.animal_controller import hato_router, animal_router
+from app.controllers.animal_controller import router, animal_router
 from app.controllers.analisis_controller import router as analisis_router
 from app.controllers.validacion_controller import router as validacion_router  # ← AÑADIDO
 from app.controllers.reportes_controller import router as reporte_router
