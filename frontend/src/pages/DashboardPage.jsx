@@ -7,7 +7,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
-import { Beef, Users, TrendingUp, AlertTriangle, FolderOpen, X, ChevronRight } from 'lucide-react'
+import { Users, TrendingUp, AlertTriangle, FolderOpen, X, ChevronRight } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 
 const C = {
@@ -18,6 +18,32 @@ const C = {
 const F = {
   brand: "Cambria, 'Times New Roman', serif",
   body:  "Arial, Helvetica, sans-serif",
+}
+
+// ── Icono de vaca (reemplaza el icono de carne "Beef" de lucide-react) ──
+// Componente local, sin dependencias nuevas, en el mismo estilo de trazo
+// que el resto de iconos lucide (stroke 2, esquinas redondeadas).
+function CowIcon({ size = 24, color = 'currentColor', style }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={style}
+    >
+      <path d="M5 9c-1.5 0-2.5-1.2-2.5-2.5S3.5 4 5 4c1 0 1.8.5 2.2 1.3" />
+      <path d="M19 9c1.5 0 2.5-1.2 2.5-2.5S20.5 4 19 4c-1 0-1.8.5-2.2 1.3" />
+      <path d="M7 7.5C7 6 8.3 5 10 5h4c1.7 0 3 1 3 2.5v2c0 1-.3 1.8-1 2.5l-.7 4.3c-.2 1.5-1.5 2.7-3 2.7h-.6c-1.5 0-2.8-1.2-3-2.7L8 12c-.7-.7-1-1.5-1-2.5z" />
+      <circle cx="9.5" cy="10.5" r="0.75" fill={color} />
+      <circle cx="14.5" cy="10.5" r="0.75" fill={color} />
+      <path d="M10.5 13.5h3" />
+    </svg>
+  )
 }
 
 export default function DashboardPage() {
@@ -83,11 +109,11 @@ export default function DashboardPage() {
   // ── KPI cards ───────────────────────────────────────────
   const tarjetas = isAdmin ? [
     { label: 'Total Usuarios',     value: dashAdmin?.total_usuarios   ?? '—', icon: Users,         accent: C.primary,    bg: '#E8F8F1' },
-    { label: 'Total Bovinos',      value: dashAdmin?.total_bovinos    ?? '—', icon: Beef,          accent: C.accentDark, bg: '#EAF4EE' },
+    { label: 'Total Bovinos',      value: dashAdmin?.total_bovinos    ?? '—', icon: CowIcon,       accent: C.accentDark, bg: '#EAF4EE' },
     { label: 'Evaluaciones Hoy',   value: dashAdmin?.evaluaciones_hoy ?? '—', icon: TrendingUp,    accent: C.warning,    bg: '#FFFBEB' },
     { label: 'Animales en Alerta', value: enAlerta,                          icon: AlertTriangle,  accent: C.danger,     bg: '#FEF2F2', clickable: true },
   ] : [
-    { label: 'Total Vacas',        value: dash?.total_animales        ?? '—', icon: Beef,          accent: C.primary,    bg: '#E8F8F1' },
+    { label: 'Total Vacas',        value: dash?.total_animales        ?? '—', icon: CowIcon,       accent: C.primary,    bg: '#E8F8F1' },
     { label: 'Mis Hatos',          value: dash?.total_hatos           ?? '—', icon: FolderOpen,    accent: C.accentDark, bg: '#EAF4EE' },
     { label: 'Evaluaciones Hoy',   value: dash?.evaluaciones_hoy      ?? '—', icon: TrendingUp,    accent: C.warning,    bg: '#FFFBEB' },
     { label: 'Animales en Alerta', value: enAlerta,                          icon: AlertTriangle,  accent: C.danger,     bg: '#FEF2F2', clickable: true },

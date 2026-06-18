@@ -263,27 +263,41 @@ def animales_en_alerta(
     current_user: Usuario = Depends(get_current_user),
 ):
     """
-    Listado de animales en alerta del ganadero autenticado.
+    Listado de animales en alerta.
+
+    - ADMIN  → considera TODOS los animales del sistema, igual que el
+      contador `_contar_animales_en_alerta` usado en /dashboard/admin.
+      (FIX: antes este endpoint siempre filtraba por
+      Hato.propietario_id == current_user.id, así que un admin que no
+      es propietario de ningún hato veía la lista vacía aunque el
+      contador del KPI mostrara animales en alerta.)
+    - GANADERO → solo los animales de sus propios hatos activos,
+      igual que antes.
+
     Usa EXACTAMENTE los mismos criterios que los contadores del dashboard:
       - BCS < 2.5
       - Peso < 280 kg  (mínimo Jersey)
       - Peso > 500 kg  (máximo Jersey hembras)
     Solo considera la ÚLTIMA medición de cada animal.
     """
-    hato_ids = [
-        h.id for h in db.query(Hato.id).filter(
-            Hato.propietario_id == current_user.id,
-            Hato.activo == True,
-        ).all()
-    ]
-    if not hato_ids:
-        return []
+    if current_user.rol == RolUsuario.ADMIN:
+        animal_ids = [a.id for a in db.query(Animal.id).all()]
+    else:
+        hato_ids = [
+            h.id for h in db.query(Hato.id).filter(
+                Hato.propietario_id == current_user.id,
+                Hato.activo == True,
+            ).all()
+        ]
+        if not hato_ids:
+            return []
 
-    animal_ids = [
-        a.id for a in db.query(Animal.id).filter(
-            Animal.hato_id.in_(hato_ids)
-        ).all()
-    ]
+        animal_ids = [
+            a.id for a in db.query(Animal.id).filter(
+                Animal.hato_id.in_(hato_ids)
+            ).all()
+        ]
+
     if not animal_ids:
         return []
 
