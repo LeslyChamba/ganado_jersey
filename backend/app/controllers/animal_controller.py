@@ -14,18 +14,18 @@ from app.services.validacion_service import validacion_service
 from app.controllers.auth_controller import get_current_user
 from app.core.config import settings
 
-# Se define explícitamente como animal_router para cumplir con la importación de main.py
-animal_router = APIRouter(prefix="/analisis", tags=["Análisis de Imágenes"])
+# Definición estándar del router para que main.py lo importe correctamente
+router = APIRouter(prefix="/analisis", tags=["Análisis de Imágenes"])
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
 
-@animal_router.post(
+@router.post(
     "/validar",
     response_model=ValidacionParOut,
     status_code=status.HTTP_200_OK,
     summary="Valida si las fotos son aptas antes del análisis completo",
     description=(
-        "Corriente únicamente YOLOv8 detección (sin SAM ni CNN) para verificar "
+        "Corre únicamente YOLOv8 detección (sin SAM ni CNN) para verificar "
         "que ambas imágenes contienen un bovino correctamente posicionado. "
         "Devuelve feedback específico por foto. Llamar ANTES de POST /analisis/."
     ),
@@ -39,7 +39,8 @@ async def validar_imagenes(
         if img.content_type not in ALLOWED_TYPES:
             raise HTTPException(
                 status_code=400,
-                detail=f"Imagen {nombre}: formato '{img.content_type}' no soportado. Usa JPEG, PNG o WebP."
+                detail=f"Imagen {nombre}: formato '{img.content_type}' no soportado. "
+                       f"Usa JPEG, PNG o WebP."
             )
         if img.size and img.size > settings.MAX_IMAGE_SIZE_BYTES:
             raise HTTPException(
@@ -59,7 +60,7 @@ async def validar_imagenes(
     )
 
 
-@animal_router.post("/", response_model=AnalisisResultado, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=AnalisisResultado, status_code=status.HTTP_201_CREATED)
 async def analizar_vaca(
     animal_id:      uuid.UUID     = Form(...),
     imagen_lateral: UploadFile    = File(...),
@@ -94,7 +95,7 @@ async def analizar_vaca(
     bytes_lateral = await imagen_lateral.read()
     bytes_trasera = await imagen_trasera.read()
 
-    # 3. Guardar imágenes en disco local/volumen persistente
+    # 3. Guardar imágenes
     medicion_id  = uuid.uuid4()
     url_lateral  = await _guardar_imagen(bytes_lateral, medicion_id, "lateral", imagen_lateral.content_type)
     url_trasera  = await _guardar_imagen(bytes_trasera, medicion_id, "trasera", imagen_trasera.content_type)
@@ -104,20 +105,20 @@ async def analizar_vaca(
         Path(settings.UPLOAD_DIR) / str(medicion_id) / f"trasera.{ext_trasera}"
     )
 
-    # 4. Pipeline visión — SAM + BCS
+    # ── 4. Pipeline visión — SAM + BCS ────────────────────────────────────
     morfometria, img_lat, confianza_vision, bcs, bcs_conf = \
         await vision_service.analizar_imagenes(bytes_lateral, bytes_trasera)
 
-    # 5. Estimación de peso — CNN híbrido (principal) + XGBoost (respaldo)
+    # ── 5. Estimación de peso — CNN híbrido (principal) + XGBoost (respaldo)
     peso_kg, bcs_final, confianza_ml, confianza_bcs = estimacion_service.estimar(
         morfometria,
-        imagen_lateral=img_lat,       # ndarray BGR para CNN híbrido
-        imagen_trasera=ruta_trasera,  # path para YOLO BCS
+        imagen_lateral=img_lat,       # ← ndarray BGR para CNN híbrido
+        imagen_trasera=ruta_trasera,  # ← path para YOLO BCS
     )
 
     confianza_final = round((confianza_vision * 0.6) + (confianza_bcs * 0.4), 3)
 
-    # 6. Guardar en BD (Neon / PostgreSQL)
+    # ── 6. Guardar en BD ───────────────────────────────────────────────────
     medicion = Medicion(
         id               = medicion_id,
         animal_id        = animal_id,
@@ -151,7 +152,7 @@ async def analizar_vaca(
     )
 
 
-@animal_router.get("/medicion/{medicion_id}", response_model=MedicionResponse)
+@router.get("/medicion/{medicion_id}", response_model=MedicionResponse)
 def obtener_medicion(
     medicion_id:  uuid.UUID,
     db:           Session = Depends(get_db),
