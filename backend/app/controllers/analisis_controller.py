@@ -5,10 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, s
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.models import Animal, Hato, Medicion, Usuario
-from app.schemas.schemas import AnalisisResultado, MedicionResponse, ValidacionFotoOut, ValidacionParOut
+from app.schemas.schemas import (
+    AnalisisResultado, MedicionResponse, ValidacionFotoOut, ValidacionParOut,
+    ComparacionRequest, ComparacionResultado,
+)
 from app.services.vision_service import vision_service
 from app.services.estimacion_service import estimacion_service
 from app.services.validacion_service import validacion_service
+from app.services.formula_service import formula_service
 from app.controllers.auth_controller import get_current_user
 from app.core.config import settings
 
@@ -167,6 +171,59 @@ def obtener_medicion(
     if not medicion:
         raise HTTPException(status_code=404, detail="Medición no encontrada")
     return MedicionResponse.model_validate(medicion)
+
+
+@router.post(
+    "/{medicion_id}/comparar",
+    response_model=ComparacionResultado,
+    status_code=status.HTTP_200_OK,
+    summary="Compara la estimación de IA contra fórmulas morfométricas clásicas",
+    description=(
+        "Recibe perímetro torácico y longitud corporal medidos manualmente "
+        "con cinta bovinométrica, calcula el peso vivo estimado según las "
+        "fórmulas de Schoorl y Crevat-Quittet, y los compara contra el peso "
+        "ya estimado por IA para esta medición. Guarda las medidas manuales "
+        "y los pesos calculados en la medición."
+    ),
+)
+def comparar_formulas(
+    medicion_id:  uuid.UUID,
+    datos:        ComparacionRequest,
+    db:           Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    medicion = db.query(Medicion).join(Animal).join(Hato).filter(
+        Medicion.id == medicion_id,
+        Hato.propietario_id == current_user.id
+    ).first()
+    if not medicion:
+        raise HTTPException(status_code=404, detail="Medición no encontrada")
+
+    resultado = formula_service.comparar(
+        peso_ia_kg             = medicion.peso_estimado_kg,
+        perimetro_toracico_cm  = datos.perimetro_toracico_cm,
+        longitud_corporal_cm   = datos.longitud_corporal_cm,
+    )
+
+    # Persistir medidas manuales y pesos calculados en la medición
+    medicion.perimetro_toracico_manual_cm = datos.perimetro_toracico_cm
+    medicion.longitud_corporal_manual_cm  = datos.longitud_corporal_cm
+    medicion.peso_schoorl_kg              = resultado.peso_schoorl_kg
+    medicion.peso_crevat_kg               = resultado.peso_crevat_kg
+    db.commit()
+
+    return ComparacionResultado(
+        medicion_id             = medicion_id,
+        peso_ia_kg              = resultado.peso_ia_kg,
+        peso_schoorl_kg         = resultado.peso_schoorl_kg,
+        peso_crevat_kg          = resultado.peso_crevat_kg,
+        diferencia_schoorl_kg   = resultado.diferencia_schoorl_kg,
+        diferencia_schoorl_pct  = resultado.diferencia_schoorl_pct,
+        diferencia_crevat_kg    = resultado.diferencia_crevat_kg,
+        diferencia_crevat_pct   = resultado.diferencia_crevat_pct,
+        perimetro_toracico_cm   = datos.perimetro_toracico_cm,
+        longitud_corporal_cm    = datos.longitud_corporal_cm,
+    )
 
 
 async def _guardar_imagen(imagen_bytes, medicion_id, vista, content_type):

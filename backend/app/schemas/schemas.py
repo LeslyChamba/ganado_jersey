@@ -255,6 +255,17 @@ class ValidacionParOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# ════════════════════════════════════════════════════════
+#  COMPARACIÓN CON FÓRMULAS MORFOMÉTRICAS
+# ════════════════════════════════════════════════════════
+
+class ComparacionRequest(BaseModel):
+    """Medidas tomadas manualmente por el ganadero con cinta bovinométrica."""
+    perimetro_toracico_cm: float = Field(gt=0, le=300)
+    longitud_corporal_cm:  float = Field(gt=0, le=300)
+
+
 class ComparacionResultado(BaseModel):
     medicion_id:             uuid.UUID
     peso_ia_kg:               float
@@ -266,3 +277,5 @@ class ComparacionResultado(BaseModel):
     diferencia_crevat_pct:    float
     perimetro_toracico_cm:    float
     longitud_corporal_cm:     float
+
+    model_config = {"from_attributes": True}
