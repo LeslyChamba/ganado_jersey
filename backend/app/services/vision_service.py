@@ -1,6 +1,12 @@
 """
-JER-Weight — Vision Service  v7.0.0  (Render — cliente del escudo de validación)
+JER-Weight — Vision Service  v7.0.1  (Render — cliente del escudo de validación)
 =================================================================================
+CAMBIO v7.0.1 vs v7.0.0:
+  ─ FIX: url ahora usa settings.HF_SPACE_URL.rstrip('/') para evitar
+    un doble slash ("//api/v1/...") si la variable de entorno
+    HF_SPACE_URL quedó guardada con "/" al final. Ese doble slash
+    puede provocar 404 en el HF Space aunque la ruta esté bien
+    definida del lado del servidor.
 CAMBIO v7 vs v6:
   ─ v6: stub puro, solo decodificaba la imagen, confianza fija 1.0.
   ─ v7: antes de decodificar/continuar, llama al endpoint
@@ -75,7 +81,8 @@ class VisionService:
         Lanza 422 si el par de fotos no muestra un bovino en condiciones
         aceptables. Retorna la confianza promedio si es válido.
         """
-        url = f"{settings.HF_SPACE_URL}/api/v1/analisis/validar"
+        # .rstrip('/') evita doble slash si HF_SPACE_URL quedó con "/" al final
+        url = f"{settings.HF_SPACE_URL.rstrip('/')}/api/v1/analisis/validar"
         headers = {"x-inference-secret": settings.INFERENCE_API_SECRET}
         files = {
             "imagen_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
