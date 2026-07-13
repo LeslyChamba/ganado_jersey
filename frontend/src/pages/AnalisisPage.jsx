@@ -1179,12 +1179,11 @@ export default function AnalisisPage() {
               <div className="font-mono text-[10px] text-center mb-4 font-bold uppercase tracking-widest"
                 style={{ color: C.textSecondary }}>ESCALA JERSEY (1–5)</div>
               <div className="flex gap-2">
-                {[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(n => {
+                {Array.from({ length: 17 }, (_, i) => 1 + i * 0.25).map(n => {
                   const isActive = Math.abs(n - resultado.bcs) < 0.125
-                  const isNear   = !isActive && Math.abs(n - resultado.bcs) <= 0.5
                   return (
-                    <div key={n} className="flex-1 h-10 rounded-lg flex items-center justify-center font-mono text-xs transition-all relative"
-                      style={{
+                  <div key={n} className="flex-1 min-w-[2.2rem] h-10 rounded-lg flex items-center justify-center font-mono text-[11px] transition-all relative"
+                    style={{
                         background: isActive ? C.primary : isNear ? '#E8F8F1' : '#FFFFFF',
                         color: isActive ? C.accent : isNear ? C.accentDark : '#9CA3AF',
                         border: `1px solid ${isActive ? C.primary : isNear ? 'rgba(82,217,160,0.3)' : '#E5E7EB'}`,

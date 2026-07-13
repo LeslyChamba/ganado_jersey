@@ -255,7 +255,7 @@ class ValidacionParOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    class ComparacionResultado(BaseModel):
+class ComparacionResultado(BaseModel):
     medicion_id:             uuid.UUID
     peso_ia_kg:               float
     peso_schoorl_kg:          float
