@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # Motor de Inferencia (HF Space) — usado por VisionService para
     # llamar al escudo de validación (/api/v1/analisis/validar) y a
     # la inferencia completa (/predecir)
-    HF_SPACE_URL: str = "https://lesly15-peso.hf.space"
+    HF_SPACE_URL: str = "https://lesly15-peso-api.hf.space"
     INFERENCE_API_SECRET: str = ""
 
     # Inferencia
