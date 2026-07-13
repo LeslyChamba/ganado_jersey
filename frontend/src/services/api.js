@@ -81,7 +81,10 @@ export const analisisApi = {
   analizar:       (formData) => api.post('/analisis/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
-  obtenerMedicion: (id)      => api.get(`/analisis/medicion/${id}`),
+   obtenerMedicion: (id)      => api.get(`/analisis/medicion/${id}`),
+  compararFormulas: (medicionId, formData) => api.post(`/analisis/${medicionId}/comparar`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 }
 
 // ─── REPORTES ─────────────────────────────────────────────────────────────

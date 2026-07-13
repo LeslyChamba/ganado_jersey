@@ -254,3 +254,15 @@ class ValidacionParOut(BaseModel):
     par_valido: bool
 
     model_config = {"from_attributes": True}
+
+    class ComparacionResultado(BaseModel):
+    medicion_id:             uuid.UUID
+    peso_ia_kg:               float
+    peso_schoorl_kg:          float
+    peso_crevat_kg:           float
+    diferencia_schoorl_kg:    float
+    diferencia_schoorl_pct:   float
+    diferencia_crevat_kg:     float
+    diferencia_crevat_pct:    float
+    perimetro_toracico_cm:    float
+    longitud_corporal_cm:     float

@@ -165,6 +165,14 @@ class Medicion(Base):
     )
     notas: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
+    # ── Comparación con fórmulas morfométricas tradicionales ────────────
+    # Medidas tomadas manualmente por el ganadero con cinta bovinométrica,
+    # ingresadas en un paso posterior a través de POST /analisis/{id}/comparar
+    perimetro_toracico_manual_cm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitud_corporal_manual_cm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    peso_schoorl_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    peso_crevat_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
     animal_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("ganaderia.animales.id"), nullable=False, index=True
     )

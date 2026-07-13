@@ -365,6 +365,162 @@ function ComparadorPesoReal({ pesoEstimado }) {
   )
 }
 
+// ─── Comparador con fórmulas morfométricas ────────────────────────────────
+function ComparadorFormulas({ medicionId, pesoIA }) {
+  const [pt, setPt]                 = useState('')
+  const [lc, setLc]                 = useState('')
+  const [cargando, setCargando]     = useState(false)
+  const [resultado, setResultado]   = useState(null)
+  const [focusField, setFocusField] = useState(null)
+
+  const inputClass = "w-full px-4 py-3.5 rounded-xl border font-mono text-sm focus:outline-none transition-all"
+  const inputStyle = (field) => ({
+    borderColor: focusField === field ? C.accentDark : 'rgba(27,67,50,0.15)',
+    background: '#F9FDFB', color: C.primary,
+    boxShadow: focusField === field ? `0 0 0 3px rgba(82,217,160,0.15)` : 'none',
+  })
+
+  const calcular = async () => {
+    const ptVal = parseFloat(pt)
+    const lcVal = parseFloat(lc)
+    if (!ptVal || ptVal <= 0 || ptVal > 300) {
+      return toast.error('Perímetro torácico inválido (esperado 50–300 cm)')
+    }
+    if (!lcVal || lcVal <= 0 || lcVal > 250) {
+      return toast.error('Longitud corporal inválida (esperado 50–250 cm)')
+    }
+    setCargando(true)
+    try {
+      const fd = new FormData()
+      fd.append('perimetro_toracico_cm', ptVal)
+      fd.append('longitud_corporal_cm', lcVal)
+      const res = await analisisApi.compararFormulas(medicionId, fd)
+      setResultado(res.data)
+      toast.success('Comparación calculada', { icon: '📏' })
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'No se pudo calcular la comparación', { icon: '❌' })
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const resetComparador = () => { setPt(''); setLc(''); setResultado(null) }
+
+  const badgeFormula = (label, pesoFormula, diffKg, diffPct) => {
+    const sobreestimo = diffKg > 0
+    const color = diffPct <= 8 ? C.accentDark : diffPct <= 15 ? '#D97706' : C.error
+    return (
+      <div className="rounded-2xl p-5" style={{ background: `${color}10`, border: `1.5px solid ${color}30` }}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color }}>
+            {label}
+          </span>
+          {diffKg !== 0 && (
+            sobreestimo
+              ? <TrendingUp size={16} style={{ color }} />
+              : <TrendingDown size={16} style={{ color }} />
+          )}
+        </div>
+        <div style={{ fontFamily: F.brand, fontSize: '2.2rem', fontWeight: 900, color: C.primary, lineHeight: 1 }}>
+          {pesoFormula.toFixed(1)}
+          <span className="font-mono text-sm" style={{ color: C.textSub }}> kg</span>
+        </div>
+        <div className="font-mono text-[10px] mt-2" style={{ color }}>
+          IA {sobreestimo ? 'sobrestimó' : 'subestimó'} {Math.abs(diffKg).toFixed(1)} kg ({diffPct.toFixed(1)}%)
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-emerald-50">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(27,67,50,0.1)]">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#E8F8F1' }}>
+          <Ruler size={20} style={{ color: C.accentDark }} />
+        </div>
+        <div>
+          <h3 style={{ fontFamily: F.brand, color: C.primary, fontSize: '1.3rem', fontWeight: 800 }}>
+            Comparar con Fórmulas Morfométricas
+          </h3>
+          <p className="font-mono text-[10px] mt-0.5 uppercase tracking-wider" style={{ color: C.textSecondary }}>
+            Schoorl y Crevat-Quittet vs. estimación IA
+          </p>
+        </div>
+      </div>
+
+      {!resultado ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="relative">
+              <label className="block font-mono text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: C.textSub }}>
+                Perímetro torácico
+              </label>
+              <input
+                type="number" min="1" step="0.5" placeholder="Ej: 178"
+                value={pt}
+                onChange={e => setPt(e.target.value)}
+                onFocus={() => setFocusField('pt')} onBlur={() => setFocusField(null)}
+                className={inputClass} style={inputStyle('pt')}
+              />
+              <span className="absolute right-4 top-[38px] font-mono text-xs font-bold" style={{ color: C.textSub }}>cm</span>
+            </div>
+            <div className="relative">
+              <label className="block font-mono text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: C.textSub }}>
+                Longitud corporal
+              </label>
+              <input
+                type="number" min="1" step="0.5" placeholder="Ej: 155"
+                value={lc}
+                onChange={e => setLc(e.target.value)}
+                onFocus={() => setFocusField('lc')} onBlur={() => setFocusField(null)}
+                className={inputClass} style={inputStyle('lc')}
+              />
+              <span className="absolute right-4 top-[38px] font-mono text-xs font-bold" style={{ color: C.textSub }}>cm</span>
+            </div>
+          </div>
+
+          <button type="button" onClick={calcular} disabled={!pt || !lc || cargando}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: C.primary, color: '#FFFFFF' }}>
+            {cargando ? <><Loader2 size={15} className="animate-spin" /> Calculando…</> : 'Calcular comparación'}
+          </button>
+
+          <div className="flex items-start gap-2 p-3.5 rounded-xl"
+            style={{ background: '#F0FBF6', border: '1px solid rgba(82,217,160,0.2)' }}>
+            <Info size={13} style={{ color: C.accentDark, flexShrink: 0, marginTop: 1 }} />
+            <span className="font-sans text-xs leading-relaxed" style={{ color: C.textSub }}>
+              Mide con cinta bovinométrica: perímetro torácico rodeando el tórax justo detrás de las patas delanteras,
+              y longitud corporal desde el hombro hasta la punta del isquion.
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-5 animate-in zoom-in-95 duration-300">
+          <div className="rounded-2xl p-5 text-center" style={{ background: C.primary }}>
+            <div className="font-mono text-[9px] uppercase tracking-widest mb-1" style={{ color: C.accent }}>
+              IA Estimó (referencia)
+            </div>
+            <div style={{ fontFamily: F.brand, fontSize: '2.4rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
+              {pesoIA.toFixed(1)} <span className="font-mono text-base" style={{ color: C.accent }}>kg</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {badgeFormula('Schoorl', resultado.peso_schoorl_kg, resultado.diferencia_schoorl_kg, resultado.diferencia_schoorl_pct)}
+            {badgeFormula('Crevat-Quittet', resultado.peso_crevat_kg, resultado.diferencia_crevat_kg, resultado.diferencia_crevat_pct)}
+          </div>
+
+          <button type="button" onClick={resetComparador}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest border transition-all hover:bg-gray-50 active:scale-95"
+            style={{ color: C.textSub, borderColor: 'rgba(27,67,50,0.15)' }}>
+            <RotateCcw size={12} /> Calcular con otras medidas
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Tarjeta de validación por foto ──────────────────────────────────────
 function ValidacionFotoCard({ titulo, resultado, onRetomar }) {
   if (!resultado) return null
@@ -1092,6 +1248,12 @@ export default function AnalisisPage() {
 
           {/* Comparador de peso real */}
           <ComparadorPesoReal pesoEstimado={resultado.peso_estimado_kg} />
+
+          {/* Comparador con fórmulas morfométricas */}
+          <ComparadorFormulas
+            medicionId={resultado.medicion_id}
+            pesoIA={resultado.peso_estimado_kg}
+          />
         </div>
 
       ) : (
