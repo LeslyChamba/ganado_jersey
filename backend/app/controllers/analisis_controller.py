@@ -187,10 +187,11 @@ def obtener_medicion(
     ),
 )
 def comparar_formulas(
-    medicion_id:  uuid.UUID,
-    datos:        ComparacionRequest,
-    db:           Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    medicion_id:            uuid.UUID,
+    perimetro_toracico_cm:  float   = Form(...),
+    longitud_corporal_cm:   float   = Form(...),
+    db:                     Session = Depends(get_db),
+    current_user:           Usuario = Depends(get_current_user),
 ):
     medicion = db.query(Medicion).join(Animal).join(Hato).filter(
         Medicion.id == medicion_id,
@@ -201,13 +202,13 @@ def comparar_formulas(
 
     resultado = formula_service.comparar(
         peso_ia_kg             = medicion.peso_estimado_kg,
-        perimetro_toracico_cm  = datos.perimetro_toracico_cm,
-        longitud_corporal_cm   = datos.longitud_corporal_cm,
+        perimetro_toracico_cm  = perimetro_toracico_cm,
+        longitud_corporal_cm   = longitud_corporal_cm,
     )
 
     # Persistir medidas manuales y pesos calculados en la medición
-    medicion.perimetro_toracico_manual_cm = datos.perimetro_toracico_cm
-    medicion.longitud_corporal_manual_cm  = datos.longitud_corporal_cm
+    medicion.perimetro_toracico_manual_cm = perimetro_toracico_cm
+    medicion.longitud_corporal_manual_cm  = longitud_corporal_cm
     medicion.peso_schoorl_kg              = resultado.peso_schoorl_kg
     medicion.peso_crevat_kg               = resultado.peso_crevat_kg
     db.commit()
@@ -221,8 +222,8 @@ def comparar_formulas(
         diferencia_schoorl_pct  = resultado.diferencia_schoorl_pct,
         diferencia_crevat_kg    = resultado.diferencia_crevat_kg,
         diferencia_crevat_pct   = resultado.diferencia_crevat_pct,
-        perimetro_toracico_cm   = datos.perimetro_toracico_cm,
-        longitud_corporal_cm    = datos.longitud_corporal_cm,
+        perimetro_toracico_cm   = perimetro_toracico_cm,
+        longitud_corporal_cm    = longitud_corporal_cm,
     )
 
 
