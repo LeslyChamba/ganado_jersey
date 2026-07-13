@@ -39,7 +39,13 @@ class Settings(BaseSettings):
     
     # Hugging Face
     HF_TOKEN: str = ""       
-    HF_REPO_ID: str = "lesly15/Peso"     
+    HF_REPO_ID: str = "lesly15/Peso"
+
+    # Motor de Inferencia (HF Space) — usado por VisionService para
+    # llamar al escudo de validación (/api/v1/analisis/validar) y a
+    # la inferencia completa (/predecir)
+    HF_SPACE_URL: str = "https://lesly15-peso.hf.space"
+    INFERENCE_API_SECRET: str = ""
 
     # Inferencia
     DEVICE: str = "cpu"
@@ -57,7 +63,7 @@ class Settings(BaseSettings):
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://ganado-jersey.vercel.app"
-    ENCRYPTION_KEY: str  # ← agregar esta línea
+    ENCRYPTION_KEY: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
