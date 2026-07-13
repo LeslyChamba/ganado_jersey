@@ -1181,6 +1181,7 @@ export default function AnalisisPage() {
               <div className="flex gap-2">
                 {Array.from({ length: 17 }, (_, i) => 1 + i * 0.25).map(n => {
                   const isActive = Math.abs(n - resultado.bcs) < 0.125
+                  const isNear = !isActive && Math.abs(n - resultado.bcs) < 0.375
                   return (
                   <div key={n} className="flex-1 min-w-[2.2rem] h-10 rounded-lg flex items-center justify-center font-mono text-[11px] transition-all relative"
                     style={{
