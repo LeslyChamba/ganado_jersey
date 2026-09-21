@@ -108,8 +108,7 @@ async def analizar_vaca(
         files_hf = {
         "imagen_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
         "imagen_trasera": ("trasera.jpg", bytes_trasera, "image/jpeg"),
-            }
-    
+        }
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
