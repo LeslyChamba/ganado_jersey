@@ -8,7 +8,7 @@ from app.db.database import get_db
 from app.models.models import Animal, Hato, Medicion, Usuario
 from app.schemas.schemas import (
     AnalisisResultado, MedicionResponse, ValidacionFotoOut, ValidacionParOut,
-    ComparacionRequest, ComparacionResultado,
+    ComparacionRequest, ComparacionResultado, MorfometriaData,
 )
 from app.services.vision_service import vision_service
 from app.services.estimacion_service import estimacion_service
@@ -105,10 +105,10 @@ async def analizar_vaca(
     # ── 4. Delegar el análisis pesado a Hugging Face ────────────────────────────
     url_inferencia = f"{settings.HF_SPACE_URL.rstrip('/')}/predecir"
     headers_hf = {"x-inference-secret": settings.INFERENCE_API_SECRET}
-        files_hf = {
+    files_hf = {
         "imagen_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
         "imagen_trasera": ("trasera.jpg", bytes_trasera, "image/jpeg"),
-        }
+    }
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
