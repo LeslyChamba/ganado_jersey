@@ -36,7 +36,7 @@ const STEPS = [
   'Segmentando silueta (SAM Neural Net)',
   'Extrayendo keypoints anatómicos',
   'Calculando morfometría computacional',
-  'Estimando masa corporal (XGBoost)',
+  'Estimando masa corporal (Efficent)',
   'Determinando BCS (YOLOv8 Gen AI)',
   'Finalizando reporte métrico',
 ]
@@ -443,7 +443,7 @@ function ComparadorFormulas({ medicionId, pesoIA }) {
             Comparar con Fórmulas Morfométricas
           </h3>
           <p className="font-mono text-[10px] mt-0.5 uppercase tracking-wider" style={{ color: C.textSecondary }}>
-            Schoorl y Crevat-Quittet vs. estimación IA
+            Schoorl y Schaeffer vs. estimación IA
           </p>
         </div>
       </div>
@@ -507,7 +507,7 @@ function ComparadorFormulas({ medicionId, pesoIA }) {
 
           <div className="grid grid-cols-2 gap-4">
             {badgeFormula('Schoorl', resultado.peso_schoorl_kg, resultado.diferencia_schoorl_kg, resultado.diferencia_schoorl_pct)}
-            {badgeFormula('Crevat-Quittet', resultado.peso_crevat_kg, resultado.diferencia_crevat_kg, resultado.diferencia_crevat_pct)}
+            {badgeFormula('Schaeffer', resultado.peso_crevat_kg, resultado.diferencia_crevat_kg, resultado.diferencia_crevat_pct)}
           </div>
 
           <button type="button" onClick={resetComparador}
