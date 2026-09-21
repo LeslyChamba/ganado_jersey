@@ -101,28 +101,35 @@ async def analizar_vaca(
     url_lateral  = await _guardar_imagen(bytes_lateral, medicion_id, "lateral", imagen_lateral.content_type)
     url_trasera  = await _guardar_imagen(bytes_trasera, medicion_id, "trasera", imagen_trasera.content_type)
 
-    ext_trasera  = imagen_trasera.content_type.split("/")[-1].replace("jpeg", "jpg")
-    ruta_trasera = str(
-        Path(settings.UPLOAD_DIR) / str(medicion_id) / f"trasera.{ext_trasera}"
-    )
+    # ── 4. Delegar el análisis pesado a Hugging Face ────────────────────────────
+    url_inferencia = f"{settings.HF_SPACE_URL.rstrip('/')}/predecir"
+    headers_hf = {"x-inference-secret": settings.INFERENCE_API_SECRET}
+    files_hf = {
+        "bytes_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
+        "bytes_trasera": ("trasera.jpg", bytes_trasera, "image/jpeg"),
+    }
 
-    # ── 4. Pipeline visión — SAM + morfometría ────────────────────────────
-    # v5.0: analizar_imagenes ya NO calcula BCS aquí (eso vive solo en
-    # EstimacionService, para no tener dos instancias de YOLO en RAM a la vez).
-    # Retorna 3 valores: morfo, img_lat (ndarray BGR para el CNN híbrido)
-    # y confianza_vision. El BCS final se obtiene en el paso 5.
-    morfometria, img_lat, confianza_vision = \
-        await vision_service.analizar_imagenes(bytes_lateral, bytes_trasera)
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url_inferencia, headers=headers_hf, files=files_hf)
+            resp.raise_for_status()
+            data_hf = resp.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=502,
+            detail="Error de comunicación con el motor de IA en Hugging Face. Intente nuevamente."
+        )
 
-    # ── 5. Estimación de peso — CNN híbrido (principal) + XGBoost (respaldo)
-    # img_lat se pasa directamente al CNN — no necesita guardarse en disco
-    peso_kg, bcs_final, confianza_ml, confianza_bcs = estimacion_service.estimar(
-        morfometria,
-        imagen_lateral=img_lat,       # ← ndarray BGR para CNN híbrido
-        imagen_trasera=ruta_trasera,  # ← path para YOLO BCS
-    )
-
-    confianza_final = round((confianza_vision * 0.6) + (confianza_bcs * 0.4), 3)
+    # ── 5. Extraer los datos REALES calculados ────────────────────────────
+    morfometria = MorfometriaData(**data_hf.get("morfometria", {}))
+    
+    peso_kg         = data_hf.get("peso_kg")
+    bcs_final       = data_hf.get("bcs")
+    confianza_ml    = data_hf.get("confianza_pct")
+    confianza_bcs   = data_hf.get("bcs_conf")
+    confianza_final = data_hf.get("confianza_final")
+    interpretacion  = data_hf.get("interpretacion_bcs")
+    recomendacion   = data_hf.get("recomendacion")
 
     # ── 6. Guardar en BD ───────────────────────────────────────────────────
     medicion = Medicion(
@@ -181,7 +188,7 @@ def obtener_medicion(
     description=(
         "Recibe perímetro torácico y longitud corporal medidos manualmente "
         "con cinta bovinométrica, calcula el peso vivo estimado según las "
-        "fórmulas de Schoorl y Crevat-Quittet, y los compara contra el peso "
+        "fórmulas de Schoorl y Schaeffer, y los compara contra el peso "
         "ya estimado por IA para esta medición. Guarda las medidas manuales "
         "y los pesos calculados en la medición."
     ),
