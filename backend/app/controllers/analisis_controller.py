@@ -106,9 +106,11 @@ async def analizar_vaca(
     url_inferencia = f"{settings.HF_SPACE_URL.rstrip('/')}/predecir"
     headers_hf = {"x-inference-secret": settings.INFERENCE_API_SECRET}
     files_hf = {
-        "bytes_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
-        "bytes_trasera": ("trasera.jpg", bytes_trasera, "image/jpeg"),
-    }
+        files_hf = {
+        "imagen_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
+        "imagen_trasera": ("trasera.jpg", bytes_trasera, "image/jpeg"),
+            }
+        }
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
