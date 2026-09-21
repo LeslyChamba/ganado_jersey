@@ -105,12 +105,11 @@ async def analizar_vaca(
     # ── 4. Delegar el análisis pesado a Hugging Face ────────────────────────────
     url_inferencia = f"{settings.HF_SPACE_URL.rstrip('/')}/predecir"
     headers_hf = {"x-inference-secret": settings.INFERENCE_API_SECRET}
-    files_hf = {
         files_hf = {
         "imagen_lateral": ("lateral.jpg", bytes_lateral, "image/jpeg"),
         "imagen_trasera": ("trasera.jpg", bytes_trasera, "image/jpeg"),
             }
-        }
+    
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
