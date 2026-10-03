@@ -68,11 +68,13 @@ export default function UsuarioModal({ abierto, usuario, onGuardar, onCerrar }) 
     if (Object.keys(e2).length) { setErrores(e2); return; }
     setCargando(true);
     try {
+      const telefonoLimpiado = form.telefono.trim() === "" ? "" : form.telefono.trim();
       const datos = esEdicion
         ? { nombre: form.nombre, apellido: form.apellido,
-            email:  form.email,  telefono: form.telefono }
-        : { ...form };
-      // En edición no mandamos password vacío
+            email:  form.email,  telefono: telefonoLimpiado }
+        : { ...form, telefono: telefonoLimpiado };
+     
+        // En edición no mandamos password vacío
       if (esEdicion) delete datos.password;
       await onGuardar(datos);
     } finally {

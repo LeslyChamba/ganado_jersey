@@ -278,8 +278,12 @@ function FilaUsuario({ usuario: u, onEditar, onToggleEstado, onCambiarRol, onEli
           <p className="font-sans text-sm font-bold truncate" style={{ color: u.activo ? C.primary : '#9CA3AF' }}>
             {u.nombre} {u.apellido}
           </p>
-          {u.telefono && <p className="font-mono text-[10px] text-gray-400 mt-0.5">{u.telefono}</p>}
-        </div>
+          {u.telefono && u.telefono !== "string" ? (
+            <p className="font-mono text-[10px] text-gray-400 mt-0.5">{u.telefono}</p>
+          ) : (
+            <p className="font-mono text-[10px] text-gray-300 italic mt-0.5">—</p>
+          )}  
+         </div>
       </div>
 
       {/* Email */}
