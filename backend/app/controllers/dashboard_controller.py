@@ -21,7 +21,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard y Auditoría"])
 # Cambiar aquí afecta contadores Y modal automáticamente.
 BCS_ALERTA        = 2.5
 PESO_MIN_JERSEY   = 280.0
-PESO_MAX_JERSEY   = 500.0
+PESO_MAX_JERSEY   = 580.0
 
 
 # ════════════════════════════════════════════════════════
