@@ -101,12 +101,12 @@ export default function LoginPage() {
       {/* PANEL IZQUIERDO: Branding */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-14"
         style={{ background: C.primary, borderRight: `1px solid ${C.accentDark}` }}>
-        <div style={{
+        <div className="text-center z-10"style={{
           fontFamily: F.body,
-          color: C.accent,
+          color: 'rgba(255,255,255,0.9)',
           fontWeight: 700,
           letterSpacing: '0.1em',
-          fontSize: '14px',
+          fontSize: '18px',
         }}>
           JER-WEIGHT
         </div>
@@ -139,11 +139,11 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div style={{
+        <div className="text-center z-10" style={{
           fontFamily: F.body,
-          color: C.textSecondary,
+          color: 'rgba(255,255,255,0.9)',
           fontSize: '0.7rem',
-          letterSpacing: '0.15em'
+          letterSpacing: '0.29em'
         }}>
           SISTEMA DE ESTIMACIÓN BOVINA
         </div>
