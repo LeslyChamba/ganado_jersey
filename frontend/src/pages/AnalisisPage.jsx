@@ -52,7 +52,7 @@ const STEPS = [
 // Validar los umbrales con el zootecnista y reflejarlos en la Tabla 2-3 de la tesis.
 function interpretarBCS(bcs) {
   if (bcs == null || isNaN(bcs)) return null
-  const bcs = Math.round(bcsCrudo * 4) / 4 
+  
   if (bcs < 2.5) return {
     etiqueta: 'Delgada', nivel: 'alerta',
     mensaje: 'La vaca está por debajo de la condición ideal y tiene pocas reservas de grasa.',
