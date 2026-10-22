@@ -862,7 +862,7 @@ function BuscadorVaca({ onVacaResuelta }) {
   const [hatoId, setHatoId]                 = useState('')
   const [hatos, setHatos]                   = useState([])
   const debounceRef = useRef()
-
+  const [confirmada, setConfirmada] = useState(false)
   useEffect(() => { hatosApi.listar().then(r => setHatos(r.data)).catch(() => {}) }, [])
 
   useEffect(() => {
@@ -883,6 +883,7 @@ function BuscadorVaca({ onVacaResuelta }) {
   const confirmarNueva = () => {
     if (!hatoId) return toast.error('Selecciona el hato para la nueva vaca')
     onVacaResuelta({ _nuevo: true, arete: arete.trim(), nombre: nombre.trim() || null, hato_id: hatoId })
+    setConfirmada(true) 
     toast.success('Datos de vaca nueva listos')
   }
 
@@ -901,7 +902,7 @@ function BuscadorVaca({ onVacaResuelta }) {
             style={{ borderColor: 'rgba(27,67,50,0.15)', background: '#F9FDFB', color: C.primary }}
             placeholder="Ej: 0045, AR-123…"
             value={arete}
-            onChange={e => { setArete(e.target.value); setVacaEncontrada(null); onVacaResuelta(null) }}
+            onChange={e => { setArete(e.target.value); setVacaEncontrada(null);  setConfirmada(false); onVacaResuelta(null) }}
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2">
             {buscando
@@ -933,46 +934,68 @@ function BuscadorVaca({ onVacaResuelta }) {
         </div>
       )}
 
-      {esNueva && (
-        <div className="space-y-4 p-5 rounded-2xl"
-          style={{ background: '#F9FDFB', border: '1px solid rgba(27,67,50,0.1)' }}>
-          <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest"
-            style={{ color: C.primary }}>
-            <UserPlus size={14} style={{ color: C.accentDark }} /> REGISTRO DE ANIMAL NUEVO
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2"
-                style={{ color: C.textSub }}>Nombre (opcional)</label>
-              <input className={inputClass}
-                style={{ borderColor: 'rgba(27,67,50,0.15)', background: C.white, color: C.primary }}
-                placeholder="Ej: Manchita" value={nombre} onChange={e => setNombre(e.target.value)} />
+      {esNueva && !confirmada && (
+          <div className="space-y-4 p-5 rounded-2xl"
+            style={{ background: '#F9FDFB', border: '1px solid rgba(27,67,50,0.1)' }}>
+            <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest"
+              style={{ color: C.primary }}>
+              <UserPlus size={14} style={{ color: C.accentDark }} /> REGISTRO DE ANIMAL NUEVO
             </div>
-            <div>
-              <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2"
-                style={{ color: C.textSub }}>Hato *</label>
-              <div className="relative">
-                <select
-                  className={`${inputClass} appearance-none pr-8`}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2"
+                  style={{ color: C.textSub }}>Nombre (opcional)</label>
+                <input className={inputClass}
                   style={{ borderColor: 'rgba(27,67,50,0.15)', background: C.white, color: C.primary }}
-                  value={hatoId} onChange={e => setHatoId(e.target.value)}>
-                  <option value="">— Seleccionar hato</option>
-                  {hatos.map(h => (
-                    <option key={h.id} value={h.id}>{h.nombre} ({h.finca})</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: C.textSub }} />
+                  placeholder="Ej: Manchita" value={nombre} onChange={e => setNombre(e.target.value)} />
+              </div>
+              <div>
+                <label className="block font-mono text-[10px] font-bold uppercase tracking-wider mb-2"
+                  style={{ color: C.textSub }}>Hato *</label>
+                <div className="relative">
+                  <select
+                    className={`${inputClass} appearance-none pr-8`}
+                    style={{ borderColor: 'rgba(27,67,50,0.15)', background: C.white, color: C.primary }}
+                    value={hatoId} onChange={e => setHatoId(e.target.value)}>
+                    <option value="">— Seleccionar hato</option>
+                    {hatos.map(h => (
+                      <option key={h.id} value={h.id}>{h.nombre} ({h.finca})</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ color: C.textSub }} />
+                </div>
               </div>
             </div>
+            <button type="button" onClick={confirmarNueva}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all active:scale-95"
+              style={{ background: C.primary, color: '#FFFFFF' }}>
+              <Check size={14} /> Confirmar datos
+            </button>
           </div>
-          <button type="button" onClick={confirmarNueva}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all active:scale-95"
-            style={{ background: C.primary, color: '#FFFFFF' }}>
-            <Check size={14} /> Confirmar datos
-          </button>
-        </div>
-      )}
+        )}
+
+        {esNueva && confirmada && (
+          <div className="flex items-center gap-4 p-4 rounded-xl"
+            style={{ background: '#E8F8F1', border: 'rgba(82,217,160,0.3) 1px solid' }}>
+            <Check size={20} style={{ color: C.accentDark }} strokeWidth={3} />
+            <div className="flex-1">
+              <div className="font-mono text-xs font-bold uppercase tracking-widest" style={{ color: C.primary }}>
+                ANIMAL NUEVO · {arete.trim()}
+              </div>
+              <div className="font-sans text-[13px] font-medium mt-0.5" style={{ color: C.textSub }}>
+                {nombre.trim() || 'Sin nombre'}
+                {' • '}
+                {hatos.find(h => h.id === hatoId)?.nombre || 'Hato seleccionado'}
+              </div>
+            </div>
+            <button type="button" onClick={() => setConfirmada(false)}
+              className="font-mono text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border hover:bg-white transition-all"
+              style={{ color: C.textSub, borderColor: 'rgba(27,67,50,0.15)' }}>
+              Editar
+            </button>
+          </div>
+        )}
     </div>
   )
 }
