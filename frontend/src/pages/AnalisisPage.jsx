@@ -52,22 +52,23 @@ const STEPS = [
 // Validar los umbrales con el zootecnista y reflejarlos en la Tabla 2-3 de la tesis.
 function interpretarBCS(bcs) {
   if (bcs == null || isNaN(bcs)) return null
+  const bcs = Math.round(bcsCrudo * 4) / 4 
   if (bcs < 2.5) return {
     etiqueta: 'Delgada', nivel: 'alerta',
     mensaje: 'La vaca está por debajo de la condición ideal y tiene pocas reservas de grasa.',
     accion: 'Revise su alimentación y consulte al veterinario. Puede afectar su producción y su fertilidad.',
   }
-  if (bcs <= 3.0) return {
+  if (bcs < 3.0) return {
     etiqueta: 'Un poco delgada', nivel: 'vigilar',
     mensaje: 'Está algo por debajo de la condición ideal, sin ser grave.',
     accion: 'Revise que esté comiendo bien y vuelva a evaluarla en 2 a 3 semanas.',
   }
-  if (bcs <= 3.5) return {
+  if (bcs < 3.5) return {
     etiqueta: 'Condición ideal', nivel: 'ok',
     mensaje: 'La vaca tiene la reserva de grasa adecuada para una Jersey.',
     accion: 'Mantenga el manejo y la alimentación actuales.',
   }
-  if (bcs <= 3.75) return {
+  if (bcs < 3.75) return {
     etiqueta: 'Buena condición (límite alto)', nivel: 'ok',
     mensaje: 'Está bien, en la parte alta del rango adecuado. No es motivo de preocupación.',
     accion: 'Mantenga la dieta actual y evite aumentar el concentrado. Revísela de nuevo en 3 a 4 semanas.',
@@ -1299,7 +1300,7 @@ export default function AnalisisPage() {
               <div className="font-mono text-[10px] text-center mb-4 font-bold uppercase tracking-widest"
                 style={{ color: C.textSecondary }}>ESCALA JERSEY (1–5)</div>
               <div className="flex gap-2">
-                {Array.from({ length: 17 }, (_, i) => 2 + i * 0.25).map(n => {
+                {Array.from({ length: 17 }, (_, i) => +(1 + i * 0.25).toFixed(2)).map(n => {
                   const isActive = Math.abs(n - resultado.bcs) < 0.125
                   const isNear = !isActive && Math.abs(n - resultado.bcs) < 0.375
                   return (
