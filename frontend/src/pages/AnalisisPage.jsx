@@ -57,17 +57,17 @@ function interpretarBCS(bcs) {
     mensaje: 'La vaca está por debajo de la condición ideal y tiene pocas reservas de grasa.',
     accion: 'Revise su alimentación y consulte al veterinario. Puede afectar su producción y su fertilidad.',
   }
-  if (bcs < 3.0) return {
+  if (bcs <= 3.0) return {
     etiqueta: 'Un poco delgada', nivel: 'vigilar',
     mensaje: 'Está algo por debajo de la condición ideal, sin ser grave.',
     accion: 'Revise que esté comiendo bien y vuelva a evaluarla en 2 a 3 semanas.',
   }
-  if (bcs < 3.5) return {
+  if (bcs <= 3.5) return {
     etiqueta: 'Condición ideal', nivel: 'ok',
     mensaje: 'La vaca tiene la reserva de grasa adecuada para una Jersey.',
     accion: 'Mantenga el manejo y la alimentación actuales.',
   }
-  if (bcs < 3.75) return {
+  if (bcs <= 3.75) return {
     etiqueta: 'Buena condición (límite alto)', nivel: 'ok',
     mensaje: 'Está bien, en la parte alta del rango adecuado. No es motivo de preocupación.',
     accion: 'Mantenga la dieta actual y evite aumentar el concentrado. Revísela de nuevo en 3 a 4 semanas.',
@@ -1336,7 +1336,7 @@ export default function AnalisisPage() {
               {bcsMsg && (
                 <div className="space-y-2 font-sans text-sm leading-relaxed" style={{ color: C.primary }}>
                   <p className="font-semibold">{bcsMsg.etiqueta}: {bcsMsg.mensaje}</p>
-                  <p>👉 {bcsMsg.accion}</p>
+                  <p> {bcsMsg.accion}</p>
                   {bcsPocoFiable && (
                     <p className="text-xs" style={{ color: '#78350F' }}>
                       Como el resultado es poco seguro, tome una nueva foto trasera para confirmarlo.
