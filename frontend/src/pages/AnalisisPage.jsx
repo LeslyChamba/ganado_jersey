@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { animalesApi, hatosApi, analisisApi } from '../services/api'
-import { getBCSColor, getBCSLabel } from '../services/helpers'
 import toast from 'react-hot-toast'
 import {
   Scale, CheckCircle2, RotateCcw, Search, UserPlus, Check,
@@ -28,8 +27,14 @@ const F = {
 }
 
 // ─── Umbrales de confianza ────────────────────────────────────────────────
+// Peso: el backend devuelve 92 (CNN), 70 (XGBoost) o 45 (fórmula). Con umbral 50
+// la fórmula de último recurso (45) SÍ dispara la advertencia.
 const BCS_CONFIDENCE_THRESHOLD  = 70
-const PESO_CONFIDENCE_THRESHOLD = 45
+const PESO_CONFIDENCE_THRESHOLD = 50
+
+// Rango de masa del dataset de entrenamiento (kg). Fuera de él, el resultado es extrapolación.
+const PESO_MIN_ENTRENAMIENTO = 303
+const PESO_MAX_ENTRENAMIENTO = 702
 
 const STEPS = [
   'Cargando imágenes al servidor seguro',
@@ -40,6 +45,51 @@ const STEPS = [
   'Determinando BCS (YOLOv8 Gen AI)',
   'Finalizando reporte métrico',
 ]
+
+// ─── Interpretación del BCS para el ganadero ──────────────────────────────
+// Rangos alineados con EstimacionService.BCS_INTERPRETACIONES del backend
+// (2.5–3.75 ideal; 3.75–4.5 sobre-condicionada; ≥4.5 obesa).
+// Validar los umbrales con el zootecnista y reflejarlos en la Tabla 2-3 de la tesis.
+function interpretarBCS(bcs) {
+  if (bcs == null || isNaN(bcs)) return null
+  if (bcs < 2.5) return {
+    etiqueta: 'Delgada', nivel: 'alerta',
+    mensaje: 'La vaca está por debajo de la condición ideal y tiene pocas reservas de grasa.',
+    accion: 'Revise su alimentación y consulte al veterinario. Puede afectar su producción y su fertilidad.',
+  }
+  if (bcs < 3.0) return {
+    etiqueta: 'Un poco delgada', nivel: 'vigilar',
+    mensaje: 'Está algo por debajo de la condición ideal, sin ser grave.',
+    accion: 'Revise que esté comiendo bien y vuelva a evaluarla en 2 a 3 semanas.',
+  }
+  if (bcs < 3.5) return {
+    etiqueta: 'Condición ideal', nivel: 'ok',
+    mensaje: 'La vaca tiene la reserva de grasa adecuada para una Jersey.',
+    accion: 'Mantenga el manejo y la alimentación actuales.',
+  }
+  if (bcs < 3.75) return {
+    etiqueta: 'Buena condición (límite alto)', nivel: 'ok',
+    mensaje: 'Está bien, en la parte alta del rango adecuado. No es motivo de preocupación.',
+    accion: 'Mantenga la dieta actual y evite aumentar el concentrado. Revísela de nuevo en 3 a 4 semanas.',
+  }
+  if (bcs < 4.5) return {
+    etiqueta: 'Sobre-condicionada', nivel: 'alerta',
+    mensaje: 'Tiene exceso de grasa, lo que puede causar problemas al parto y menor fertilidad.',
+    accion: 'Reduzca los concentrados energéticos y ajuste la dieta con su zootecnista antes del parto.',
+  }
+  return {
+    etiqueta: 'Obesa', nivel: 'alerta',
+    mensaje: 'Exceso de grasa importante, con riesgo de problemas metabólicos.',
+    accion: 'Consulte al veterinario para reducir la dieta lo antes posible.',
+  }
+}
+
+// Colores de la tarjeta BCS según el nivel (coherentes con el mensaje)
+const NIVEL_BCS = {
+  ok:      { bg: '#D4ECD9', text: C.primary, bar: C.primary },
+  vigilar: { bg: '#FDE68A', text: '#78350F', bar: '#78350F' },
+  alerta:  { bg: '#C0392B', text: '#FFFFFF', bar: '#FFFFFF' },
+}
 
 // ─── Normalizador de confianza ────────────────────────────────────────────
 // El backend puede devolver 0-1 (decimal) o 0-100 (porcentaje).
@@ -125,7 +175,7 @@ function ModalOpciones({ open, onClose, onCamara, onGaleria }) {
         {/* Botón: Cámara */}
         <button
           type="button"
-          onClick={() => { onClose(); setTimeout(onCamara, 80) }}   
+          onClick={() => { onClose(); setTimeout(onCamara, 80) }}
           className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all active:scale-95"
           style={{ background: C.primary, color: '#FFFFFF' }}
         >
@@ -349,7 +399,7 @@ function ComparadorPesoReal({ pesoEstimado }) {
                 <div className="absolute inset-y-0 w-0.5" style={{ left: '25%', background: 'rgba(0,0,0,0.25)' }} />
               </div>
               <div className="font-mono text-[8px] mt-1" style={{ color: C.textSub }}>
-                ← Zona ideal (≤ 5%) | Literatura científica Jersey: MAE ≈ 4–15 kg
+                ← Zona ideal (≤ 5%)
               </div>
             </div>
           </div>
@@ -580,7 +630,7 @@ function ValidacionFotoCard({ titulo, resultado, onRetomar }) {
   )
 }
 
-// ─── Badge de confianza ───────────────────────────────────────────────────
+// ─── Badge de seguridad del modelo ────────────────────────────────────────
 function ConfianzaBadge({ valor, umbral, label }) {
   const baja  = valor < umbral
   const media = !baja && valor < umbral + 15
@@ -589,7 +639,9 @@ function ConfianzaBadge({ valor, umbral, label }) {
   const bord  = baja ? '#FECACA' : media ? C.warningBorder : 'rgba(82,217,160,0.3)'
   const Icon  = baja ? ShieldAlert : media ? AlertTriangle : Check
   return (
-    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider"
+    <div
+      title="Qué tan seguro está el modelo con esta foto. No es la exactitud global del sistema."
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider"
       style={{ background: bg, color, border: `1px solid ${bord}` }}>
       <Icon size={12} strokeWidth={baja ? 2 : 3} />
       {label}: {valor.toFixed(1)}%
@@ -957,66 +1009,59 @@ export default function AnalisisPage() {
   const handleValidarFotos = async () => {
     if (!imgLateral) return toast.error('Necesitas la foto lateral primero')
     if (!imgTrasera) return toast.error('Necesitas la foto trasera primero')
-    
+
     const [calLat, calTra] = await Promise.all([
       validarCalidadLocal(imgLateral), validarCalidadLocal(imgTrasera),
     ])
-    
+
     if (!calLat.ok) return toast.error(`Foto lateral: ${calLat.motivo}`, { duration: 5000 })
     if (!calTra.ok) return toast.error(`Foto trasera: ${calTra.motivo}`, { duration: 5000 })
-    
-    setValidandoFotos(true); 
+
+    setValidandoFotos(true)
     setValidacion(null)
-    
+
     try {
       const [latComp, traComp] = await Promise.all([
         comprimirImagen(imgLateral), comprimirImagen(imgTrasera),
       ])
-      
+
       const fd = new FormData()
       fd.append('imagen_lateral', latComp)
       fd.append('imagen_trasera', traComp)
-      
-      // Invocar el endpoint de validación en el servidor
+
       const res = await analisisApi.validar(fd)
-      
-      // SI LLEGA AQUÍ: El backend respondió 200 OK (Pasó el escudo perfectamente)
+
       setValidacion(res.data)
       toast.success('Ambas fotos son aptas para el análisis', { icon: '✅' })
-      
+
     } catch (err) {
       console.error('Error en el escudo de validación:', err)
-      
-      // 🛑 CAPTURAMOS EL ERROR 400 DEL ESCUDO DE IA
+
       if (err.response && err.response.status === 400) {
-        const mensajeIA = err.response.data?.detail || 'Una o ambas fotos necesitan corrección';
-        
-        // Lanzamos la notificación flotante
+        const mensajeIA = err.response.data?.detail || 'Una o ambas fotos necesitan corrección'
         toast.error(mensajeIA, { icon: '⚠️', duration: 5000 })
-        
-        // 🔥 MEJORA DE UX: Alimentamos las tarjetas de validación con el error de la IA
+
         setValidacion({
           par_valido: false,
           lateral: {
             es_valida: false,
             animal_detectado: false,
             motivo: mensajeIA,
-            sugerencia: "Por favor, asegúrese de capturar la silueta completa de la vaca Jersey según la guía."
+            sugerencia: 'Por favor, asegúrese de capturar la silueta completa de la vaca Jersey según la guía.'
           },
           trasera: {
             es_valida: false,
             animal_detectado: false,
             motivo: mensajeIA,
-            sugerencia: "Verifique que la grupa esté centrada y que el lente de la cámara esté limpio."
+            sugerencia: 'Verifique que la grupa esté centrada y que el lente de la cámara esté limpio.'
           }
         })
       } else {
-        // Errores genéricos de red o caída de servidor
         toast.error('Error de comunicación con el motor de validación', { icon: '❌' })
         setValidacion(null)
       }
-    } finally { 
-      setValidandoFotos(false) 
+    } finally {
+      setValidandoFotos(false)
     }
   }
 
@@ -1067,11 +1112,26 @@ export default function AnalisisPage() {
     animationAbortRef.current = true
   }
 
+  // ── Valores derivados del resultado ─────────────────────────────────
   const confianzaPeso = normalizarConfianza(resultado?.confianza_peso ?? resultado?.confianza)
   const confianzaBcs  = normalizarConfianza(resultado?.confianza_bcs  ?? resultado?.bcs_confianza)
-  const bcsInfo       = resultado ? getBCSColor(resultado.bcs) : null
-  const bcsTextColor  = bcsInfo?.bg === '#10B981' ? C.primary : '#FFFFFF'
-  const bcsBgColor    = bcsInfo?.bg === '#10B981' ? '#D4ECD9' : bcsInfo?.bg
+
+  // Interpretación del BCS (etiqueta + mensaje + acción) y colores coherentes con el nivel
+  const bcsMsg       = resultado ? interpretarBCS(resultado.bcs) : null
+  const bcsColores   = NIVEL_BCS[bcsMsg?.nivel] || NIVEL_BCS.ok
+  const bcsBgColor   = bcsColores.bg
+  const bcsTextColor = bcsColores.text
+
+  // Método con el que se calculó el peso (requiere que el backend envíe `metodo_peso`;
+  // si no lo envía, se infiere por el nivel de confianza: 92 = CNN, 70 = XGBoost, 45 = fórmula)
+  const metodoPeso  = resultado?.metodo_peso ?? resultado?.metodo ?? null
+  const esRespaldo  = metodoPeso ? metodoPeso !== 'cnn_hibrido_ensemble' : confianzaPeso < 85
+  const pesoKg      = resultado?.peso_estimado_kg
+  const pesoFueraRango = pesoKg != null &&
+    (pesoKg < PESO_MIN_ENTRENAMIENTO || pesoKg > PESO_MAX_ENTRENAMIENTO)
+
+  const pesoPocoFiable = confianzaPeso < PESO_CONFIDENCE_THRESHOLD || pesoFueraRango
+  const bcsPocoFiable  = confianzaBcs  < BCS_CONFIDENCE_THRESHOLD
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto space-y-8 relative z-10 pb-12">
@@ -1116,7 +1176,7 @@ export default function AnalisisPage() {
             </div>
 
             {/* Cards principales */}
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <div className="grid md:grid-cols-2 gap-6 mb-4">
               {/* Peso */}
               <div className="rounded-[1.5rem] p-8 text-center"
                 style={{ background: C.primary, boxShadow: '0 10px 30px rgba(8,28,17,0.15)' }}>
@@ -1128,7 +1188,7 @@ export default function AnalisisPage() {
                 </div>
                 <div className="font-mono text-[10px] mt-3 uppercase tracking-wider"
                   style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  Confianza: {confianzaPeso.toFixed(1)}%
+                  Seguridad del modelo: {confianzaPeso.toFixed(1)}%
                 </div>
                 <div className="mt-3 h-1.5 rounded-full overflow-hidden relative"
                   style={{ background: 'rgba(255,255,255,0.15)' }}>
@@ -1137,9 +1197,9 @@ export default function AnalisisPage() {
                   <div className="absolute inset-y-0 w-0.5"
                     style={{ left: `${PESO_CONFIDENCE_THRESHOLD}%`, background: 'rgba(255,255,255,0.4)' }} />
                 </div>
-                {confianzaPeso < PESO_CONFIDENCE_THRESHOLD && (
+                {pesoPocoFiable && (
                   <div className="mt-2 font-mono text-[9px] font-bold" style={{ color: C.warning }}>
-                    ⚠ Baja confianza — repita foto lateral
+                    ⚠ Resultado poco fiable — repita la foto lateral
                   </div>
                 )}
               </div>
@@ -1152,27 +1212,64 @@ export default function AnalisisPage() {
                   {resultado.bcs?.toFixed(1)}
                 </div>
                 <div className="inline-block mt-3 px-4 py-1.5 rounded-lg font-mono text-[10px] font-bold shadow-sm"
-                  style={{ background: 'rgba(255,255,255,0.9)', color: C.primary }}>
-                  {getBCSLabel(resultado.bcs)}
+                  style={{ background: 'rgba(255,255,255,0.92)', color: C.primary }}>
+                  {bcsMsg?.etiqueta}
                 </div>
                 <div className="font-mono text-[10px] mt-4 uppercase tracking-wider font-bold"
                   style={{ color: bcsTextColor, opacity: 0.85 }}>
-                  Confianza: {confianzaBcs.toFixed(1)}%
+                  Seguridad del modelo: {confianzaBcs.toFixed(1)}%
                 </div>
                 <div className="mt-2 h-1.5 rounded-full overflow-hidden relative"
                   style={{ background: 'rgba(0,0,0,0.15)' }}>
                   <div className="h-full rounded-full transition-all duration-1000"
-                    style={{ width: `${confianzaBcs}%`, background: confianzaBcs >= BCS_CONFIDENCE_THRESHOLD ? bcsTextColor : '#7F1D1D' }} />
+                    style={{ width: `${confianzaBcs}%`, background: confianzaBcs >= BCS_CONFIDENCE_THRESHOLD ? bcsColores.bar : '#7F1D1D' }} />
                   <div className="absolute inset-y-0 w-0.5"
                     style={{ left: `${BCS_CONFIDENCE_THRESHOLD}%`, background: 'rgba(0,0,0,0.4)' }} />
                 </div>
-                {confianzaBcs < BCS_CONFIDENCE_THRESHOLD && (
-                  <div className="mt-2 font-mono text-[10px] font-bold" style={{ color: '#7F1D1D' }}>
-                    ⚠ BCS de baja confianza — repita foto trasera
+                {bcsPocoFiable && (
+                  <div className="mt-2 font-mono text-[10px] font-bold" style={{ color: bcsTextColor }}>
+                    ⚠ Resultado poco seguro — repita la foto trasera
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Explicación de la "seguridad del modelo" */}
+            <details className="mb-6 rounded-xl px-4 py-3"
+              style={{ background: '#F9FDFB', border: '1px solid rgba(27,67,50,0.1)' }}>
+              <summary className="cursor-pointer font-mono text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: C.textSub }}>
+                ¿Qué significa “seguridad del modelo”?
+              </summary>
+              <p className="font-sans text-xs leading-relaxed mt-2" style={{ color: C.textSub }}>
+                Indica qué tan seguro está el modelo con <strong>esta foto en particular</strong>.
+                No es el porcentaje de acierto del sistema. Si el valor es bajo, o aparece una
+                advertencia, repita la foto siguiendo la guía de captura.
+                {esRespaldo && ' El peso se calculó con un método de respaldo, menos preciso que el principal.'}
+              </p>
+            </details>
+
+            {/* Avisos de calidad del peso */}
+            {(esRespaldo || pesoFueraRango) && (
+              <div className="mb-6 flex items-start gap-3 p-4 rounded-xl"
+                style={{ background: C.warningBg, border: `1px solid ${C.warningBorder}` }}>
+                <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: 2 }} />
+                <div className="font-sans text-xs leading-relaxed" style={{ color: '#78350F' }}>
+                  {pesoFueraRango && (
+                    <p>
+                      El peso estimado está fuera del rango con el que se entrenó el modelo
+                      ({PESO_MIN_ENTRENAMIENTO}–{PESO_MAX_ENTRENAMIENTO} kg). Verifique con báscula o cinta.
+                    </p>
+                  )}
+                  {esRespaldo && (
+                    <p>
+                      No se pudo usar el modelo principal con esta foto. Pruebe con otra foto lateral,
+                      con la vaca completa, de pie y con luz uniforme.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Escala BCS */}
             <div className="mb-8 p-6 rounded-[1.5rem] bg-[#F9FDFB] border border-[rgba(27,67,50,0.1)]">
@@ -1198,21 +1295,32 @@ export default function AnalisisPage() {
                   )
                 })}
               </div>
+              <p className="font-mono text-[9px] text-center mt-3 uppercase tracking-wider" style={{ color: C.textSecondary }}>
+                El modelo distingue las categorías 3.0 · 3.25 · 3.5 · 4.0 · 4.5
+              </p>
             </div>
 
-            {/* Recomendación */}
+            {/* Interpretación y recomendación (mismo criterio que la etiqueta del BCS) */}
             <div className="rounded-[1.5rem] p-6 bg-white border border-emerald-100 relative overflow-hidden">
               <div className="absolute left-0 top-0 bottom-0 w-1"
-                style={{ background: confianzaBcs < BCS_CONFIDENCE_THRESHOLD || confianzaPeso < PESO_CONFIDENCE_THRESHOLD ? C.warning : C.accent }} />
+                style={{ background: bcsPocoFiable || pesoPocoFiable ? C.warning : C.accent }} />
               <div className="flex items-center gap-2 mb-3">
                 <Info size={16} style={{ color: C.accentDark }} />
                 <div className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: C.accentDark }}>
-                  Análisis Nutricional
+                  Qué significa y qué hacer
                 </div>
               </div>
-              <div className="text-sm leading-relaxed font-sans font-medium" style={{ color: C.primary }}>
-                "{resultado.recomendacion}"
-              </div>
+              {bcsMsg && (
+                <div className="space-y-2 font-sans text-sm leading-relaxed" style={{ color: C.primary }}>
+                  <p className="font-semibold">{bcsMsg.etiqueta}: {bcsMsg.mensaje}</p>
+                  <p>👉 {bcsMsg.accion}</p>
+                  {bcsPocoFiable && (
+                    <p className="text-xs" style={{ color: '#78350F' }}>
+                      Como el resultado es poco seguro, tome una nueva foto trasera para confirmarlo.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1226,9 +1334,9 @@ export default function AnalisisPage() {
                 </h3>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                {/* "Alzada a la cruz" se omite: en el pipeline es la constante de referencia (118 cm) usada como escala, no una medición */}
                 {[
                   ['Largo corporal',     resultado.morfometria.largo_corporal_cm],
-                  ['Alzada a la cruz',   resultado.morfometria.alzada_cm],
                   ['Perímetro torácico', resultado.morfometria.perimetro_toracico_cm],
                   ['Ancho de cadera',    resultado.morfometria.ancho_caderas_cm],
                   ['Profund. torácica',  resultado.morfometria.profundidad_toracica_cm],
