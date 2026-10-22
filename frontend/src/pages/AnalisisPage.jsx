@@ -38,7 +38,7 @@ const PESO_MAX_ENTRENAMIENTO = 702
 
 const STEPS = [
   'Cargando imágenes al servidor seguro',
-  'Segmentando silueta (SAM Neural Net)',
+  'Segmentando silueta',
   'Extrayendo keypoints anatómicos',
   'Calculando morfometría computacional',
   'Estimando masa corporal (Efficent)',
@@ -1299,7 +1299,7 @@ export default function AnalisisPage() {
               <div className="font-mono text-[10px] text-center mb-4 font-bold uppercase tracking-widest"
                 style={{ color: C.textSecondary }}>ESCALA JERSEY (1–5)</div>
               <div className="flex gap-2">
-                {Array.from({ length: 17 }, (_, i) => 1 + i * 0.25).map(n => {
+                {Array.from({ length: 17 }, (_, i) => 2 + i * 0.25).map(n => {
                   const isActive = Math.abs(n - resultado.bcs) < 0.125
                   const isNear = !isActive && Math.abs(n - resultado.bcs) < 0.375
                   return (
