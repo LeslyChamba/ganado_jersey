@@ -1,19 +1,20 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
+import api from "../services/api";
 
 export default function RestablecerPassword() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const navigate = useNavigate();
 
-  const [password, setPassword]           = useState("");
+  const [password, setPassword]               = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPwd,  setShowPwd]            = useState(false);
-  const [showConf, setShowConf]           = useState(false);
-  const [error,    setError]              = useState("");
-  const [cargando, setCargando]           = useState(false);
-  const [exito,    setExito]              = useState(false);
+  const [showPwd,  setShowPwd]                = useState(false);
+  const [showConf, setShowConf]               = useState(false);
+  const [error,    setError]                  = useState("");
+  const [cargando, setCargando]               = useState(false);
+  const [exito,    setExito]                  = useState(false);
 
   /* ── Fortaleza ── */
   function calcStrength(p) {
@@ -44,22 +45,26 @@ export default function RestablecerPassword() {
 
     setCargando(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, nueva_password: password }),
+      await api.post("/auth/reset-password", {
+        token,
+        nueva_password: password,
       });
 
-      const datos = await res.json();
-
-      if (res.ok) {
-        setExito(true);
-        setTimeout(() => navigate("/login"), 3000);
+      setExito(true);
+      setTimeout(() => navigate("/login"), 3000);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (err.response) {
+        // El servidor respondió con error (token inválido/expirado, etc.)
+        setError(
+          typeof detail === "string"
+            ? detail
+            : "El enlace es inválido o ya expiró."
+        );
       } else {
-        setError(datos.detail || "El enlace es inválido o ya expiró.");
+        // No hubo respuesta (servidor dormido, sin internet, CORS)
+        setError("Error de conexión con el servidor.");
       }
-    } catch {
-      setError("Error de conexión con el servidor.");
     } finally {
       setCargando(false);
     }
@@ -138,7 +143,7 @@ export default function RestablecerPassword() {
             {password && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} style={{
                       flex: 1, height: 4, borderRadius: 4,
                       background: strength >= i ? strengthColors[strength] : "#e5e7eb",
@@ -222,7 +227,7 @@ export default function RestablecerPassword() {
   );
 }
 
-/* ── Estilos en objeto (sin dependencia de F ni Tailwind obligatorio) ──────── */
+/* ── Estilos en objeto (sin dependencia de Tailwind obligatorio) ──────── */
 const s = {
   page: {
     minHeight: "100vh",
